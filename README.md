@@ -45,36 +45,97 @@ pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp se
 ```json
 {
   "indexer": {
-    "source_paths": [
-      "C:/MyProject/src",
-      "./test/data"
-    ],
+    "source_paths": ["C:/MyProject/src", "./test/data"],
     "extensions": [".cpp", ".h", ".c", ".cs"],
-    "exclude_patterns": ["*/build/*", "*/.git/*", "*/generated/*"]
+    "exclude_patterns": ["*/build/*", "*/.git/*", "*/generated/*"],
+    "chunk_min_lines": 5,
+    "chunk_max_lines": 80,
+    "chunk_overlap_lines": 10,
+    "chunk_workers": 0
   },
   "models": {
-    "embed": "BAAI/bge-m3"
+    "cache_dir": "",
+    "embed": "BAAI/bge-m3",
+    "rerank": "cross-encoder/ms-marco-MiniLM-L-12-v2"
+  },
+  "embedding": {
+    "vector_size": 1024,
+    "batch_size": 64,
+    "n_gpu_layers": -1
+  },
+  "vector_store": {
+    "mode": "server",
+    "host": "localhost",
+    "port": 6333,
+    "data_path": "./data/qdrant",
+    "collection": "code_index_chunks"
   },
   "search": {
     "top_k": 20,
-    "alpha": 0.7
+    "rerank_top_k": 8,
+    "min_score": 0.0,
+    "alpha": 0.5,
+    "use_reranker": false
   },
   "debug": false
 }
 ```
 
+### indexer
+
 | 항목 | 설명 | 기본값 |
 |---|---|---|
-| `indexer.source_paths` | 인덱싱할 소스 경로 목록 | `[]` |
-| `indexer.extensions` | 대상 확장자 | `.cpp .h .c .cs` |
-| `indexer.chunk_min_lines` | 최소 청크 라인 수 | `5` |
-| `indexer.chunk_max_lines` | 최대 청크 라인 수 | `150` |
-| `models.embed` | 임베딩 모델 (HuggingFace ID) | `BAAI/bge-m3` |
-| `embedding.vector_size` | 벡터 차원 | `1024` |
-| `search.top_k` | 기본 반환 결과 수 | `20` |
-| `search.alpha` | Dense/BM25 가중치 (1.0=Dense 전용) | `0.7` |
-| `search.use_reranker` | 재랭커 사용 여부 | `false` |
-| `debug` | MCP 요청/응답 로깅 (`log.txt`) | `false` |
+| `source_paths` | 인덱싱할 소스 경로 목록. 절대 경로 또는 프로젝트 루트 기준 상대 경로 | `[]` |
+| `extensions` | 인덱싱 대상 확장자 목록 | `[".cpp", ".h", ".c", ".cs"]` |
+| `exclude_patterns` | 제외할 경로 패턴 (glob). `*/build/*` 등 빌드 산출물 제외에 사용 | `["*/build/*", "*/.git/*", "*/generated/*"]` |
+| `chunk_min_lines` | 이 값 미만의 라인 수를 가진 심볼은 청크에서 제외 | `5` |
+| `chunk_max_lines` | 청크 최대 라인 수. 초과 시 overlap을 유지하며 분할 | `80` |
+| `chunk_overlap_lines` | 분할된 청크 간 중복 라인 수. 컨텍스트 연속성 유지 | `10` |
+| `chunk_workers` | 청킹 병렬 프로세스 수. `0` = CPU 코어 수의 절반 자동 사용 | `0` |
+
+### models
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `cache_dir` | 모델 다운로드 캐시 경로. 비워두면 프로젝트 루트의 `.cache/` 사용 | `""` |
+| `embed` | 임베딩 모델 HuggingFace ID. 변경 시 `vector_size`도 함께 변경하고 재인덱싱 필요 | `"BAAI/bge-m3"` |
+| `rerank` | 재랭커 모델 HuggingFace ID. `search.use_reranker: true` 일 때만 로드됨 | `"cross-encoder/ms-marco-MiniLM-L-12-v2"` |
+
+### embedding
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `vector_size` | 임베딩 벡터 차원. 사용하는 `models.embed` 모델의 출력 차원과 일치해야 함 | `1024` |
+| `batch_size` | 임베딩 배치 크기. GPU VRAM에 따라 조정 (RTX 3060: 64, RTX 4090: 128+) | `64` |
+| `n_gpu_layers` | (예약) GPU 레이어 수. 현재 미사용 | `-1` |
+
+### vector_store
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `mode` | `"server"`: 별도 Qdrant 프로세스 사용 (권장), `"embedded"`: Python 프로세스 내 내장 모드 | `"server"` |
+| `host` | Qdrant 서버 호스트. `mode: "server"` 일 때 사용 | `"localhost"` |
+| `port` | Qdrant HTTP 포트. gRPC는 `port + 1` 자동 사용 | `6333` |
+| `data_path` | Qdrant 데이터 저장 경로. `mode: "server"` 시 서버 시작 인자로 전달됨 | `"./data/qdrant"` |
+| `collection` | Qdrant 컬렉션 이름. 변경 시 기존 데이터와 호환되지 않으므로 재인덱싱 필요 | `"code_index_chunks"` |
+
+> **server mode**: 최초 실행 시 `.cache/qdrant/qdrant.exe`를 GitHub Releases에서 자동 다운로드하고 백그라운드 프로세스로 기동합니다. code_index 종료 시 함께 종료됩니다.
+
+### search
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `top_k` | 검색 결과 반환 수. 리랭커 사용 시 이 수만큼 후보를 뽑아 `rerank_top_k`로 압축 | `20` |
+| `rerank_top_k` | 리랭커 최종 반환 수. `use_reranker: true` 일 때만 적용 | `8` |
+| `min_score` | 최소 점수 필터. 이 값 미만 결과는 제외 (`0.0` = 필터 없음) | `0.0` |
+| `alpha` | Dense/BM25 가중치. `1.0` = Dense 전용, `0.0` = BM25 전용, `0.5` = 균등 혼합 | `0.5` |
+| `use_reranker` | `true` 시 `models.rerank` 모델로 결과를 재정렬해 정확도 향상. 속도 소폭 저하 | `false` |
+
+### 최상위
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `debug` | `true` 시 MCP 요청/응답을 `log.txt`에 기록 | `false` |
 
 ---
 
@@ -217,16 +278,18 @@ AI 클라이언트가 호출할 수 있는 도구입니다.
 
 ## 데이터 저장 위치
 
-| 파일 | 내용 |
+| 파일/디렉터리 | 내용 |
 |---|---|
 | `./data/metadata.db` | 파일/청크 메타데이터 + FTS5 BM25 인덱스 (SQLite) |
 | `./data/embed_cache.db` | content_hash → 임베딩 벡터 캐시 (SQLite) |
-| `./data/qdrant/` | HNSW 벡터 인덱스 (Qdrant embedded) |
+| `./data/qdrant/` | HNSW 벡터 인덱스 (Qdrant 데이터) |
+| `./.cache/qdrant/qdrant.exe` | 자동 다운로드된 Qdrant 실행 파일 |
+| `./.cache/` | HuggingFace 모델 캐시 (`models.cache_dir` 미설정 시) |
 | `./log.txt` | MCP 요청/응답 로그 (`debug: true` 시) |
 
 인덱스를 완전히 초기화하려면:
 ```powershell
-Remove-Item ./data -Recurse
+python -m code_index --remove
 python -m code_index --index-only
 ```
 

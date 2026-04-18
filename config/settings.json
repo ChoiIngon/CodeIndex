@@ -1,11 +1,7 @@
 ﻿{
   "indexer": {
 	"source_paths": [
-    "E:\\work\\ArenaBattle",
-    "E:\\work\\blog",
-    "E:\\work\\Pulseforge",
-    "E:\\work\\TheDungeon.0.2",
-		"./test/data"
+    "./test/data"
 	],
     "extensions": [
       ".cpp",
@@ -17,10 +13,12 @@
       "*/build/*",
       "*/.git/*",
       "*/generated/*",
-      "*/__pycache__/*"
+      "*/__pycache__/*",
+      "*/Packages/*",
+      "*/Library/*"
     ],
     "chunk_min_lines": 3,
-    "chunk_max_lines": 150,
+    "chunk_max_lines": 80,
     "chunk_overlap_lines": 10,
     "chunk_workers": 0
   },
@@ -45,8 +43,8 @@
     "top_k": 20,
     "rerank_top_k": 8,
     "min_score": 0.0,
-    "alpha": 0.7,
-    "use_reranker": false
+    "alpha": 0.5,
+    "use_reranker": true
   },
 
   "debug": true

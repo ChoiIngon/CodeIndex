@@ -5,9 +5,12 @@ _DEFAULT = {
     "indexer": {
         "source_paths": [],
         "extensions": [".cpp", ".h", ".c", ".cs"],
-        "exclude_patterns": ["*/build/*", "*/.git/*", "*/generated/*"],
+        "exclude_patterns": [
+            "*/build/*", "*/.git/*", "*/generated/*",
+            "*/Packages/*", "*/Library/*",
+        ],
         "chunk_min_lines": 5,
-        "chunk_max_lines": 150,
+        "chunk_max_lines": 80,
         "chunk_overlap_lines": 10,
     },
     "models": {
@@ -27,7 +30,7 @@ _DEFAULT = {
         "top_k": 20,
         "rerank_top_k": 8,
         "min_score": 0.0,
-        "alpha": 0.7,
+        "alpha": 0.5,
         "use_reranker": False,
     },
     "debug": False,

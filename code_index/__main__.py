@@ -65,6 +65,21 @@ _GET_CHUNK        = "--get-chunk"        in sys.argv
 _SINGLE_QUERY     = _SEARCH_CODE or _GET_FILE_OUTLINE or _GET_CHUNK
 _HTTP_PORT        = int(_get_arg("--http-port")) if "--http-port" in sys.argv else None
 
+# 알 수 없는 옵션 감지 (-- 로 시작하는 인자 중 인식되지 않는 것)
+_KNOWN_FLAGS = {
+    "--index-only", "--query-batch", "--help", "--status", "--remove",
+    "--search-code", "--get-file-outline", "--get-chunk", "--http-port",
+    "--top-k", "--language", "--symbol-type",
+}
+_unknown = [a for a in sys.argv[1:] if a.startswith("--") and a not in _KNOWN_FLAGS]
+if _unknown:
+    print(
+        f"[Error] 알 수 없는 옵션: {', '.join(_unknown)}\n"
+        f"  사용법을 확인하려면: python -m code_index --help",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 
 def _print_help() -> None:
     cwd = str(Path(__file__).parent.parent.resolve()).replace("\\", "/")
