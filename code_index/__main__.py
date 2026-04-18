@@ -145,20 +145,20 @@ MCP 설정:
       }}
     }}
 
-  ── SSE 모드 (--http-port PORT 지정 시) ─────────────────────────────────
+  ── HTTP 모드 (--http-port PORT 지정 시) ────────────────────────────────
   code_index를 먼저 HTTP 서버로 실행한 뒤 여러 에디터가 URL로 접속합니다.
   에디터 여러 개 동시 사용 시 적합합니다.
 
   1) code_index 실행:
        python -m code_index --http-port 6380
-       → [MCP] MapleCodeIndex MCP 서버 시작 (SSE  http://127.0.0.1:6380/sse)...
+       → [MCP] MapleCodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:6380/mcp)...
 
   2) 각 에디터 MCP 설정:
   ▶ Claude Desktop
   └ {{
       "mcpServers": {{
         "MapleCodeIndex": {{
-          "url": "http://127.0.0.1:6380/sse"
+          "url": "http://127.0.0.1:6380/mcp"
         }}
       }}
     }}
@@ -167,8 +167,8 @@ MCP 설정:
   └ {{
       "servers": {{
         "MapleCodeIndex": {{
-          "type": "sse",
-          "url": "http://127.0.0.1:6380/sse"
+          "type": "http",
+          "url": "http://127.0.0.1:6380/mcp"
         }}
       }}
     }}

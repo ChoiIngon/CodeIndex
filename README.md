@@ -9,7 +9,7 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 - Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합
 - SHA-256 기반 증분 인덱싱 — 변경된 파일만 재처리
 - GPU 자동 감지 및 CUDA wheel 자동 설치
-- MCP stdio / HTTP(SSE) 두 가지 전송 방식 지원
+- MCP stdio / HTTP(streamable-http) 두 가지 전송 방식 지원
 
 ---
 
@@ -40,6 +40,7 @@ pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp se
 ## 설정
 
 `config/settings.json` 파일에서 인덱싱 대상 경로와 옵션을 설정합니다.
+"./test/data"는 실제 사용시 삭제해도 됩니다.
 
 ```json
 {
@@ -91,7 +92,7 @@ python -m code_index --index-only
 python -m code_index
 ```
 
-### HTTP(SSE) 모드로 MCP 서버 실행 (여러 에디터 동시 사용)
+### HTTP 모드로 MCP 서버 실행 (여러 에디터 동시 사용)
 
 ```powershell
 python -m code_index --http-port 6380
@@ -168,7 +169,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 }
 ```
 
-### HTTP(SSE) 모드 (에디터 여러 개 동시 사용)
+### HTTP 모드 (에디터 여러 개 동시 사용)
 
 먼저 서버를 실행합니다:
 ```powershell
@@ -182,7 +183,7 @@ python -m code_index --http-port 6380
 {
   "mcpServers": {
     "MapleCodeIndex": {
-      "url": "http://127.0.0.1:6380/sse"
+      "url": "http://127.0.0.1:6380/mcp"
     }
   }
 }
@@ -193,8 +194,8 @@ python -m code_index --http-port 6380
 {
   "servers": {
     "MapleCodeIndex": {
-      "type": "sse",
-      "url": "http://127.0.0.1:6380/sse"
+      "type": "http",
+      "url": "http://127.0.0.1:6380/mcp"
     }
   }
 }

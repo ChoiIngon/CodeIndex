@@ -152,8 +152,8 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
         return output
 
     if http_port is not None:
-        print(f"[MCP] MapleCodeIndex MCP 서버 시작 (SSE  http://127.0.0.1:{http_port}/sse)...", file=sys.stderr)
-        mcp.run(transport="sse")
+        print(f"[MCP] MapleCodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:{http_port}/mcp)...", file=sys.stderr)
+        mcp.run(transport="streamable-http")
     else:
         print("[MCP] MapleCodeIndex MCP 서버 시작 (stdio)...", file=sys.stderr)
         mcp.run(transport="stdio")
