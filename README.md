@@ -216,7 +216,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 }
 ```
 
-**Visual Studio 2022** — `.vs\mcp.json` (솔루션 전용) 또는 `%USERPROFILE%\.vs\mcp.json` (전역)
+**Visual Studio 2022** — `<솔루션폴더>\.mcp.json` (솔루션 전용, 소스컨트롤 추적 가능) 또는 `%USERPROFILE%\.mcp.json` (전역, `C:\Users\<사용자명>\.mcp.json`)
 ```json
 {
   "servers": {

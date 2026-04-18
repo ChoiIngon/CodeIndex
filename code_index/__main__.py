@@ -194,8 +194,9 @@ MCP 설정:
   ── 파일 위치 (private / global) ────────────────────────────────────────
   VS Code     private : .vscode/mcp.json  (워크스페이스 루트)
               global  : %APPDATA%\\Code\\User\\mcp.json
-  VS 2022     private : .vs\\mcp.json  (솔루션 파일과 같은 폴더)
-              global  : %USERPROFILE%\\.vs\\mcp.json
+  VS 2022     private : .mcp.json  (솔루션 파일과 같은 폴더, 소스컨트롤 추적 가능)
+              private : .vs\\mcp.json  (솔루션 파일과 같은 폴더, VS 전용)
+              global  : %USERPROFILE%\\.mcp.json  (C:\\Users\\<사용자명>\\.mcp.json)
   Claude      공통    : %APPDATA%\\Claude\\claude_desktop_config.json
 """)
 
