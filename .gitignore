@@ -4,6 +4,9 @@ data/
 # 모델 캐시
 .cache/
 
+# Qdrant 초기화 마커
+.qdrant-initialized
+
 # 디버그 로그
 log.txt
 

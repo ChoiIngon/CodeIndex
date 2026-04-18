@@ -32,15 +32,27 @@ class SearchResult:
 
 
 class VectorStore:
-    COLLECTION = "maple_code_chunks"
+    COLLECTION = "code_index_chunks"
 
     def __init__(self, vs_cfg: dict, vector_size: int):
         self._vector_size = vector_size
         self._collection = vs_cfg.get("collection", self.COLLECTION)
 
-        data_path = vs_cfg.get("data_path", "./data/qdrant")
-        Path(data_path).mkdir(parents=True, exist_ok=True)
-        self._client = QdrantClient(path=data_path)
+        mode = vs_cfg.get("mode", "server")
+        if mode == "server":
+            host      = vs_cfg.get("host", "localhost")
+            port      = int(vs_cfg.get("port", 6333))
+            grpc_port = int(vs_cfg.get("grpc_port", port + 1))
+            self._client = QdrantClient(
+                host=host,
+                port=port,
+                grpc_port=grpc_port,
+                prefer_grpc=True,   # HTTP 대비 5~10배 빠름
+            )
+        else:
+            data_path = vs_cfg.get("data_path", "./data/qdrant")
+            Path(data_path).mkdir(parents=True, exist_ok=True)
+            self._client = QdrantClient(path=data_path)
 
         self._ensure_collection()
 
@@ -63,7 +75,7 @@ class VectorStore:
             hnsw_config=HnswConfigDiff(
                 m=16,
                 ef_construct=200,
-                full_scan_threshold=0,  # 항상 HNSW 사용
+                full_scan_threshold=10,  # server mode 최솟값 10 (항상 HNSW 사용)
             ),
         )
         for field_name, schema in [
@@ -77,12 +89,6 @@ class VectorStore:
                 field_name=field_name,
                 field_schema=schema,
             )
-
-    def upsert(self, chunk_id: str, vector: list, payload: dict):
-        self._client.upsert(
-            collection_name=self._collection,
-            points=[PointStruct(id=_id_to_uint64(chunk_id), vector=vector, payload={**payload, "chunk_id": chunk_id})],
-        )
 
     def upsert_batch(self, chunks: list, vecs: list):
         """chunks: list[Chunk], vecs: list[list[float]]"""
@@ -141,10 +147,6 @@ class VectorStore:
                 end_line=p.get("end_line", 0),
             ))
         return results
-
-    def count(self) -> int:
-        return self._client.count(collection_name=self._collection).count
-
 
 def _id_to_uint64(chunk_id: str) -> int:
     import hashlib

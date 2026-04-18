@@ -15,11 +15,13 @@ _DEFAULT = {
         "embed": "BAAI/bge-m3",
         "rerank": "cross-encoder/ms-marco-MiniLM-L-12-v2",
     },
-    "embedding": {"vector_size": 1024, "batch_size": 32, "n_gpu_layers": -1},
+    "embedding": {"vector_size": 1024, "batch_size": 64, "n_gpu_layers": -1},
     "vector_store": {
-        "mode": "embedded",
+        "mode": "server",
+        "host": "localhost",
+        "port": 6333,
         "data_path": "./data/qdrant",
-        "collection": "maple_code_chunks",
+        "collection": "code_index_chunks",
     },
     "search": {
         "top_k": 20,

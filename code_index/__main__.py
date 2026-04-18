@@ -54,7 +54,6 @@ def _get_arg(flag: str, default=None):
     return default
 
 
-_ARGS             = set(sys.argv[1:])
 _INDEX_ONLY       = "--index-only"       in sys.argv
 _QUERY_BATCH      = "--query-batch"      in sys.argv
 _HELP             = "--help"             in sys.argv
@@ -80,7 +79,7 @@ MapleCodeIndex  ─  코드 시랜틱 검색 & MCP 서버
   --http-port PORT    HTTP(SSE) 모드로 MCP 서버 실행 (예: --http-port 6380)
                       생략 시 stdio 모드로 실행합니다.
   --status            인덱싱 상태 출력 (프로젝트별 파일/청크 수, 최종 인덱싱 시각)
-  --remove            설치된 pip 패키지, 모델 캐시, 인덱스 데이터를 모두 삭제합니다.
+  --remove            설치된 pip 패키지, .cache/(모델+Qdrant), 인덱스 데이터를 모두 삭제합니다.
                       재설치 테스트나 완전 초기화 시 사용합니다.
   --help              이 도움말 출력
 
@@ -193,6 +192,7 @@ _REQUIRED = [
     "sentencepiece",
     "einops",
     "qdrant_client",
+    "grpc",
     "tree_sitter",
     "tree_sitter_cpp",
     "tree_sitter_c_sharp",
@@ -205,6 +205,7 @@ _INSTALL_NAMES = {
     "tree_sitter_c_sharp": "tree-sitter-c-sharp",
     "mcp": "mcp",
     "qdrant_client": "qdrant-client",
+    "grpc": "grpcio",
 }
 
 
@@ -378,7 +379,7 @@ def _do_remove() -> None:
 
     print("[Remove] 다음 항목을 삭제합니다:", file=sys.stderr)
     print("  - pip 패키지 (torch, sentence-transformers, qdrant-client, tree-sitter 등)", file=sys.stderr)
-    print("  - 모델 캐시 (HuggingFace / sentence-transformers)", file=sys.stderr)
+    print("  - .cache/ (모델 캐시 + Qdrant 실행 파일)", file=sys.stderr)
     print("  - 인덱스 데이터 (벡터 DB, 메타데이터 DB, 임베딩 캐시)", file=sys.stderr)
     answer = input("  계속하시겠습니까? [y/N] ").strip().lower()
     if answer not in ("y", "yes"):
@@ -491,7 +492,18 @@ if _STATUS:
     print(f"  전체 청크 : {_total['total_chunks']:,}개")
     print(f"  메타 DB   : {_meta_path}")
     print(f"  임베딩 캐시: {_cache_path}")
-    print(f"  벡터 DB   : {_data_dir}")
+    _qdrant_mode = _vs_cfg.get("mode", "server")
+    if _qdrant_mode == "server":
+        _q_host = _vs_cfg.get("host", "localhost")
+        _q_port = _vs_cfg.get("port", 6333)
+        _q_cache = Path(__file__).parent.parent / ".cache"
+        _q_exe_name = "qdrant.exe" if sys.platform == "win32" else "qdrant"
+        _q_exe = _q_cache / "qdrant" / _q_exe_name
+        _q_ready = "준비됨" if _q_exe.exists() else "미설치 (최초 실행 시 자동 다운로드)"
+        print(f"  벡터 DB   : server mode  ({_q_host}:{_q_port})")
+        print(f"  Qdrant exe: {_q_exe}  [{_q_ready}]")
+    else:
+        print(f"  벡터 DB   : embedded mode  ({_data_dir})")
     _debug    = _cfg.get("debug", False)
     _log_path = str(Path("log.txt").resolve())
     _model_cache_dir = _cfg.get("models", {}).get("cache_dir", "").strip()
@@ -550,6 +562,15 @@ if not (_GET_FILE_OUTLINE or _GET_CHUNK):
     if cfg["search"].get("use_reranker", False):
         print("[Setup] 리랭커 모델 확인 중...", file=sys.stderr)
         resolve_model(model_cfg["rerank"], cache_dir)
+
+
+# ── 4. Qdrant 서버 기동 (server mode 일 때) ──────────────────────────────────
+
+if not (_GET_FILE_OUTLINE or _GET_CHUNK):
+    if cfg["vector_store"].get("mode", "server") == "server":
+        from .store.qdrant_server import ensure_qdrant_server  # noqa: E402
+        _qdrant_cache_root = Path(__file__).parent.parent / ".cache"
+        ensure_qdrant_server(cfg["vector_store"], _qdrant_cache_root)
 
 
 # ── query-batch 모드 ────────────────────────────────────────────────────────
@@ -766,8 +787,6 @@ if _GET_CHUNK:
 
 
 # ── 4. 인덱싱 ─────────────────────────────────────────────────────────────
-
-import os  # noqa: E402
 
 from .store.metadata_store import MetadataStore  # noqa: E402
 

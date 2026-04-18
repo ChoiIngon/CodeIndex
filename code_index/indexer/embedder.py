@@ -35,9 +35,14 @@ class Embedder:
         # use_fast=False: Rust fast tokenizer PyO3 바인딩 버그 우회 (sentencepiece 필요)
         self._tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
         print(f"[Embedder] 토크나이저: {type(self._tokenizer).__name__}", file=sys.stderr)
-        self._model = AutoModel.from_pretrained(model_name).to(self._device)
+
+        # FP16: CUDA 환경에서 메모리 절반, 속도 1.5~2배 (RTX 3060 이상 Tensor Core 활용)
+        dtype = torch.float16 if self._device == "cuda" else torch.float32
+        self._model = AutoModel.from_pretrained(model_name, dtype=dtype).to(self._device)
         self._model.eval()
-        print("[Embedder] 모델 로드 완료.", file=sys.stderr)
+
+        self._dtype = dtype
+        print(f"[Embedder] 모델 로드 완료 (dtype={dtype}).", file=sys.stderr)
 
     # ── 공개 API ────────────────────────────────────────────────────────────
 
@@ -84,7 +89,9 @@ class Embedder:
             )
             encoded = {k: v.to(self._device) for k, v in encoded.items()}
             with self._torch.no_grad():
-                out = self._model(**encoded)
+                # autocast: FP16 모델에서 mixed precision 연산 보장
+                with self._torch.autocast(device_type=self._device, dtype=self._dtype, enabled=(self._device == "cuda")):
+                    out = self._model(**encoded)
             # CLS 토큰 (인덱스 0) 사용 — bge 계열 표준
             vecs = out.last_hidden_state[:, 0]
             vecs = F.normalize(vecs, p=2, dim=1)

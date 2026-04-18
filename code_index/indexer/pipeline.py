@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import queue
 import sys
+import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional
@@ -77,8 +79,6 @@ def run_index(cfg: Optional[dict] = None) -> None:
         cache.close()
         return
 
-    # 수정 파일은 기존 인덱스 먼저 삭제
-    modified_set = set(modified_files)
     for fpath in modified_files:
         _delete_file(fpath, metadata, vector_store)
 
@@ -89,19 +89,71 @@ def run_index(cfg: Optional[dict] = None) -> None:
         "chunk_overlap_lines": idx_cfg.get("chunk_overlap_lines", 10),
     }
 
-    # 청킹 병렬 워커 수: 0 또는 미설정이면 CPU 절반 자동 사용
-    cpu_count = os.cpu_count() or 4
+    cpu_count   = os.cpu_count() or 4
     cfg_workers = idx_cfg.get("chunk_workers", 0)
-    workers = cfg_workers if cfg_workers > 0 else max(1, cpu_count // 2)
+    workers     = cfg_workers if cfg_workers > 0 else max(1, cpu_count // 2)
     total       = len(to_index)
 
-    print(f"[Pipeline] 청킹 시작 (병렬 워커={workers}, 파일={total}개)...", file=sys.stderr)
-    t_chunk = time.time()
+    print(
+        f"[Pipeline] 청킹+임베딩 파이프라인 시작 "
+        f"(청킹 워커={workers}, 임베딩 배치={batch_size}, 파일={total}개)...",
+        file=sys.stderr,
+    )
+    t_start = time.time()
 
-    # 임베딩 대기 버퍼 (batch_size 단위로 flush)
+    # ── 청킹 결과를 흘려보내는 큐 ────────────────────────────────────────────
+    # maxsize 를 크게 잡아 back-pressure 로 인한 producer 블록 최소화
+    result_q: queue.Queue = queue.Queue(maxsize=workers * 64)
+    _SENTINEL = object()
+
+    # ── 프로듀서 스레드: ProcessPoolExecutor 로 병렬 청킹 ──────────────────────
+    chunked_produced = [0]  # 청킹 완료 카운트 (producer 기준)
+    chunked_count    = [0]  # 소비 카운트 (consumer 기준)
+    embed_batches         = [0]
+    total_chunks_embedded = [0]
+    _producer_done   = threading.Event()
+
+    def _producer() -> None:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_chunk_worker, (fpath, chunk_cfg)): fpath
+                for fpath in to_index
+            }
+            for future in as_completed(futures):
+                chunked_produced[0] += 1
+                result_q.put(future.result())
+        result_q.put(_SENTINEL)
+        _producer_done.set()
+
+    # ── 진행률 출력 스레드: 0.5초마다 \r 덮어쓰기 ────────────────────────────
+    def _progress_reporter() -> None:
+        while not _producer_done.is_set():
+            elapsed = time.time() - t_start
+            produced = chunked_produced[0]
+            consumed = chunked_count[0]
+            embedded = total_chunks_embedded
+            rate = produced / elapsed if elapsed > 0 else 0
+            pct  = produced * 100 // total if total else 0
+            print(
+                f"\r[청킹] {produced}/{total} ({pct}%)  "
+                f"임베딩={consumed}파일/{embedded}청크  "
+                f"{rate:.1f}파일/s  {elapsed:.0f}s",
+                end="",
+                file=sys.stderr,
+                flush=True,
+            )
+            _producer_done.wait(timeout=0.5)
+        # 완료 후 줄바꿈
+        print(file=sys.stderr)
+
+    producer_thread  = threading.Thread(target=_producer,          daemon=True)
+    progress_thread  = threading.Thread(target=_progress_reporter, daemon=True)
+    producer_thread.start()
+    progress_thread.start()
+
+    # ── 컨슈머 (메인 스레드): 임베딩 + upsert ────────────────────────────────
     embed_buffer: list = []
     file_meta: dict    = {}   # fpath -> (sha, mtime)
-    chunked = 0
 
     def _flush(force: bool = False) -> None:
         while len(embed_buffer) >= batch_size or (force and embed_buffer):
@@ -113,36 +165,45 @@ def run_index(cfg: Optional[dict] = None) -> None:
             if len(vecs) == len(batch):
                 vector_store.upsert_batch(batch, vecs)
                 metadata.upsert_chunks(batch)
+            embed_batches[0]         += 1
+            total_chunks_embedded[0] += len(batch)
 
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            pool.submit(_chunk_worker, (fpath, chunk_cfg)): fpath
-            for fpath in to_index
-        }
+    # 진행률 로깅 (500파일마다 또는 완료 시)
+    LOG_INTERVAL = 500
 
-        for future in as_completed(futures):
-            fpath, chunks, sha, mtime, err = future.result()
-            chunked += 1
+    while True:
+        item = result_q.get()
+        if item is _SENTINEL:
+            break
 
-            if chunked % 500 == 0 or chunked == total:
-                elapsed = time.time() - t_chunk
-                print(
-                    f"[Pipeline] 청킹 {chunked}/{total}  "
-                    f"({elapsed:.0f}s, {chunked/elapsed:.0f}파일/s)",
-                    file=sys.stderr,
-                )
+        fpath, chunks, sha, mtime, err = item
+        chunked_count[0] += 1
+        n = chunked_count[0]
 
-            if err:
-                print(f"[Pipeline] 오류 {fpath}: {err}", file=sys.stderr)
+        if n % LOG_INTERVAL == 0 or n == total:
+            elapsed = time.time() - t_start
+            files_s  = n / elapsed if elapsed > 0 else 0
+            print(
+                f"[Pipeline] 청킹(완료/소비)={chunked_produced[0]}/{n}/{total}  "
+                f"임베딩 배치={embed_batches[0]}  청크={total_chunks_embedded[0]}  "
+                f"({elapsed:.0f}s, {files_s:.1f}파일/s)",
+                file=sys.stderr,
+            )
 
-            if not chunks:
-                if sha:
-                    metadata.upsert_file(fpath, sha, mtime)
-                continue
+        if err:
+            print(f"[Pipeline] 오류 {fpath}: {err}", file=sys.stderr)
 
-            embed_buffer.extend(chunks)
-            file_meta[fpath] = (sha, mtime)
-            _flush()
+        if not chunks:
+            if sha:
+                metadata.upsert_file(fpath, sha, mtime)
+            continue
+
+        embed_buffer.extend(chunks)
+        file_meta[fpath] = (sha, mtime)
+        _flush()
+
+    producer_thread.join()
+    progress_thread.join()
 
     # 버퍼 잔량 임베딩
     _flush(force=True)
@@ -151,11 +212,11 @@ def run_index(cfg: Optional[dict] = None) -> None:
     for fpath, (sha, mtime) in file_meta.items():
         metadata.upsert_file(fpath, sha, mtime)
 
-    t_total = time.time() - t0
+    t_total = time.time() - t_start
     stats = metadata.stats()
     print(
         f"[Pipeline] 완료. {total}개 파일 / {stats['total_chunks']}개 청크 "
-        f"({t_total:.1f}s)",
+        f"({t_total:.1f}s, 평균 {total/t_total:.1f}파일/s)",
         file=sys.stderr,
     )
 

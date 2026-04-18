@@ -124,12 +124,6 @@ class MetadataStore:
             )
         self._con.commit()
 
-    def delete_chunks(self, chunk_ids: list):
-        for cid in chunk_ids:
-            self._con.execute("DELETE FROM chunks WHERE chunk_id=?", (cid,))
-            self._con.execute("DELETE FROM chunks_fts WHERE chunk_id=?", (cid,))
-        self._con.commit()
-
     def get_chunk(self, chunk_id: str) -> Optional[ChunkMeta]:
         row = self._con.execute(
             "SELECT * FROM chunks WHERE chunk_id=?", (chunk_id,)

@@ -1,6 +1,10 @@
 ﻿{
   "indexer": {
 	"source_paths": [
+    "E:\\work\\ArenaBattle",
+    "E:\\work\\blog",
+    "E:\\work\\Pulseforge",
+    "E:\\work\\TheDungeon.0.2",
 		"./test/data"
 	],
     "extensions": [
@@ -27,13 +31,15 @@
   },
   "embedding": {
     "vector_size": 1024,
-    "batch_size": 32,
+    "batch_size": 64,
     "n_gpu_layers": -1
   },
   "vector_store": {
-    "mode": "embedded",
+    "mode": "server",
+    "host": "localhost",
+    "port": 6333,
     "data_path": "./data/qdrant",
-    "collection": "maple_code_chunks"
+    "collection": "code_index_chunks"
   },
   "search": {
     "top_k": 20,
