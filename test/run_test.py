@@ -1,8 +1,8 @@
 """
-MapleCodeIndex 정확도 테스트
+CodeIndex 정확도 테스트
 
 사용법:
-    cd C:\MapleCodeIndex
+    cd C:\CodeIndex
     python test/run_test.py
 
 동작:
@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 # ── 경로 ─────────────────────────────────────────────────────────────────────
-ROOT       = Path(__file__).parent.parent.resolve()   # C:\MapleCodeIndex
+ROOT       = Path(__file__).parent.parent.resolve()   # C:\CodeIndex
 TEST_DATA  = (ROOT / "test" / "data").as_posix()
 SETTINGS   = ROOT / "config" / "settings.json"
 

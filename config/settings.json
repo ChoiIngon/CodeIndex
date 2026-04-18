@@ -1,8 +1,8 @@
 ﻿{
   "indexer": {
-	"source_paths": [
-    "./test/data"
-	],
+    "source_paths": [
+      "E:/work/CodeIndex/test/data"
+    ],
     "extensions": [
       ".cpp",
       ".h",
@@ -15,7 +15,8 @@
       "*/generated/*",
       "*/__pycache__/*",
       "*/Packages/*",
-      "*/Library/*"
+      "*/Library/*",
+      "*/TextMesh Pro/*"
     ],
     "chunk_min_lines": 3,
     "chunk_max_lines": 80,
@@ -46,6 +47,5 @@
     "alpha": 0.5,
     "use_reranker": true
   },
-
   "debug": true
 }

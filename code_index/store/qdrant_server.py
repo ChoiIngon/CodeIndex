@@ -15,6 +15,7 @@ import sys
 import time
 import zipfile
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import urlretrieve
 
 QDRANT_VERSION = "v1.17.1"
@@ -75,7 +76,12 @@ def _download(cache_root: Path) -> Path:
             pct = min(int(count * block_size * 100 / total_size), 100)
             print(f"\r  {pct:3d}%", end="", file=sys.stderr, flush=True)
 
-    urlretrieve(url, archive, _progress)
+    try:
+        urlretrieve(url, archive, _progress)
+    except URLError as e:
+        print(f"\n[Qdrant] 다운로드 실패({e.reason})", file=sys.stderr)
+        print("일시적 네트워크 오류일 수 있으니 잠시 후 code_index를 재시작 해주세요", file=sys.stderr)
+        sys.exit(1)
     print(file=sys.stderr)
 
     # ── 압축 해제 ─────────────────────────────────────────────────────────────
@@ -189,7 +195,7 @@ def ensure_qdrant_server(vs_cfg: dict, cache_root: Path) -> None:
     atexit.register(_kill_proc)
 
     if not _wait_ready(host, port, timeout=30):
-        _proc.terminate()
+        
         _proc = None
         raise RuntimeError(
             f"[Qdrant] 서버 시작 실패 (30초 초과). "

@@ -47,9 +47,9 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
 
     if http_port is not None:
         host = "127.0.0.1"
-        mcp_instance = FastMCP("MapleCodeIndex", host=host, port=http_port)
+        mcp_instance = FastMCP("CodeIndex", host=host, port=http_port)
     else:
-        mcp_instance = FastMCP("MapleCodeIndex")
+        mcp_instance = FastMCP("CodeIndex")
 
     mcp = mcp_instance
 
@@ -152,10 +152,10 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
         return output
 
     if http_port is not None:
-        print(f"[MCP] MapleCodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:{http_port}/mcp)...", file=sys.stderr)
+        print(f"[MCP] CodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:{http_port}/mcp)...", file=sys.stderr)
         mcp.run(transport="streamable-http")
     else:
-        print("[MCP] MapleCodeIndex MCP 서버 시작 (stdio)...", file=sys.stderr)
+        print("[MCP] CodeIndex MCP 서버 시작 (stdio)...", file=sys.stderr)
         mcp.run(transport="stdio")
 
 

@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 _DEFAULT = {
@@ -61,7 +62,14 @@ def load_config(path: str = "") -> dict:
     settings = dict(_DEFAULT)
     if path and Path(path).exists():
         with open(path, encoding="utf-8-sig") as f:
-            user = json.load(f)
+            raw = f.read()
+        try:
+            user = json.loads(raw)
+        except json.JSONDecodeError as e:
+            lines = raw.splitlines()
+            bad_line = lines[e.lineno - 1] if e.lineno <= len(lines) else ""
+            print(f"설정 데이터 에러 :\n - 경로 : {path}({e.lineno})\n - 원인 : {e.msg}\n - 내용 : {bad_line}")
+            sys.exit(1)
         settings = _deep_merge(settings, user)
 
     return settings

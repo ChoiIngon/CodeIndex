@@ -85,7 +85,7 @@ def _print_help() -> None:
     cwd = str(Path(__file__).parent.parent.resolve()).replace("\\", "/")
     py  = sys.executable.replace("\\", "/")
     print(f"""\
-MapleCodeIndex  ─  코드 시랜틱 검색 & MCP 서버
+CodeIndex  ─  코드 시랜틱 검색 & MCP 서버
 
 사용법:
   python -m code_index [옵션]
@@ -143,7 +143,7 @@ MCP 설정:
   ├ %APPDATA%\\Claude\\claude_desktop_config.json
   └ {{
       "mcpServers": {{
-        "MapleCodeIndex": {{
+        "CodeIndex": {{
           "command": "{py}",
           "args": ["-m", "code_index"],
           "cwd": "{cwd}"
@@ -154,7 +154,7 @@ MCP 설정:
   ▶ VS Code / Visual Studio 2022
   └ {{
       "servers": {{
-        "MapleCodeIndex": {{
+        "CodeIndex": {{
           "type": "stdio",
           "command": "{py}",
           "args": ["-m", "code_index"],
@@ -169,13 +169,13 @@ MCP 설정:
 
   1) code_index 실행:
        python -m code_index --http-port 6380
-       → [MCP] MapleCodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:6380/mcp)...
+       → [MCP] CodeIndex MCP 서버 시작 (HTTP  http://127.0.0.1:6380/mcp)...
 
   2) 각 에디터 MCP 설정:
   ▶ Claude Desktop
   └ {{
       "mcpServers": {{
-        "MapleCodeIndex": {{
+        "CodeIndex": {{
           "url": "http://127.0.0.1:6380/mcp"
         }}
       }}
@@ -184,7 +184,7 @@ MCP 설정:
   ▶ VS Code / Visual Studio 2022
   └ {{
       "servers": {{
-        "MapleCodeIndex": {{
+        "CodeIndex": {{
           "type": "http",
           "url": "http://127.0.0.1:6380/mcp"
         }}
@@ -502,7 +502,7 @@ if _STATUS:
             return iso
 
     print("=" * 60)
-    print("  MapleCodeIndex  인덱싱 상태")
+    print("  CodeIndex  인덱싱 상태")
     print("=" * 60)
     print(f"  전체 파일 : {_total['total_files']:,}개")
     print(f"  전체 청크 : {_total['total_chunks']:,}개")

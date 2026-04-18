@@ -193,7 +193,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 ```json
 {
   "mcpServers": {
-    "MapleCodeIndex": {
+    "CodeIndex": {
       "command": "python",
       "args": ["-m", "code_index"],
       "cwd": "E:/work/CodeIndex"
@@ -206,7 +206,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 ```json
 {
   "servers": {
-    "MapleCodeIndex": {
+    "CodeIndex": {
       "type": "stdio",
       "command": "python",
       "args": ["-m", "code_index"],
@@ -220,7 +220,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 ```json
 {
   "servers": {
-    "MapleCodeIndex": {
+    "CodeIndex": {
       "type": "stdio",
       "command": "python",
       "args": ["-m", "code_index"],
@@ -243,7 +243,7 @@ python -m code_index --http-port 6380
 ```json
 {
   "mcpServers": {
-    "MapleCodeIndex": {
+    "CodeIndex": {
       "url": "http://127.0.0.1:6380/mcp"
     }
   }
@@ -254,7 +254,7 @@ python -m code_index --http-port 6380
 ```json
 {
   "servers": {
-    "MapleCodeIndex": {
+    "CodeIndex": {
       "type": "http",
       "url": "http://127.0.0.1:6380/mcp"
     }
