@@ -7,8 +7,8 @@ MapleCodeIndex 정확도 테스트
 
 동작:
     1. config/settings.json 의 source_paths 에 test/data 가 없으면 추가
-    2. python maple_code_index --index-only 실행 (의존성 설치, 모델 다운, 인덱싱)
-    3. python maple_code_index --query-batch 로 10개 쿼리 일괄 실행
+    2. python code_index --index-only 실행 (의존성 설치, 모델 다운, 인덱싱)
+    3. python code_index --query-batch 로 10개 쿼리 일괄 실행
     4. 예상 심볼이 top-K 결과 안에 있는지 판정 후 리포트 출력
 """
 from __future__ import annotations
@@ -62,10 +62,10 @@ def ensure_test_data_in_settings() -> None:
 # ── 2. 인덱싱 실행 ────────────────────────────────────────────────────────────
 
 def run_indexing() -> bool:
-    print("\n[인덱싱] python maple_code_index --index-only 실행 중...\n")
+    print("\n[인덱싱] python code_index --index-only 실행 중...\n")
     t0 = time.time()
     proc = subprocess.run(
-        [sys.executable, "maple_code_index", "--index-only"],
+        [sys.executable, "code_index", "--index-only"],
         cwd=str(ROOT),
     )
     elapsed = time.time() - t0
@@ -87,7 +87,7 @@ def run_queries(top_k: int = 20) -> list[dict] | None:
     print("\n[검색] 쿼리 배치 실행 중...")
     t0 = time.time()
     proc = subprocess.run(
-        [sys.executable, "maple_code_index", "--query-batch", "--top-k", str(top_k)],
+        [sys.executable, "code_index", "--query-batch", "--top-k", str(top_k)],
         cwd=str(ROOT),
         input=queries_input,
         capture_output=True,
