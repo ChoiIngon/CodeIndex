@@ -1,0 +1,48 @@
+﻿{
+  "indexer": {
+	"source_paths": [
+		"E:\\work\\TheDungeon.0.2\\Assets",
+		"./test/data"
+	],
+    "extensions": [
+      ".cpp",
+      ".h",
+      ".c",
+      ".cs"
+    ],
+    "exclude_patterns": [
+      "*/build/*",
+      "*/.git/*",
+      "*/generated/*",
+      "*/__pycache__/*"
+    ],
+    "chunk_min_lines": 3,
+    "chunk_max_lines": 150,
+    "chunk_overlap_lines": 10,
+    "chunk_workers": 0
+  },
+  "models": {
+    "cache_dir": "",
+    "embed": "BAAI/bge-m3",
+    "rerank": "cross-encoder/ms-marco-MiniLM-L-12-v2"
+  },
+  "embedding": {
+    "vector_size": 1024,
+    "batch_size": 32,
+    "n_gpu_layers": -1
+  },
+  "vector_store": {
+    "mode": "embedded",
+    "data_path": "./data/qdrant",
+    "collection": "maple_code_chunks"
+  },
+  "search": {
+    "top_k": 20,
+    "rerank_top_k": 8,
+    "min_score": 0.0,
+    "alpha": 0.7,
+    "use_reranker": false
+  },
+
+  "debug": true
+}

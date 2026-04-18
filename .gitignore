@@ -1,0 +1,19 @@
+# 인덱스 데이터
+data/
+
+# 디버그 로그
+log.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# 에디터
+.vscode/settings.json
+.idea/
+*.suo
+*.user
