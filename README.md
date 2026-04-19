@@ -21,10 +21,39 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 
 ---
 
+## Quick Start
+
+1. **클론**
+   ```powershell
+   git clone https://github.com/ChoiIngon/CodeIndex.git
+   cd CodeIndex
+   ```
+
+2. **경로 설정** — `config/settings.json`의 `indexer.source_paths`에 인덱싱할 경로 추가 (자세한 내용은 [설정](#설정) 참고)
+   ```json
+   { "indexer": { "source_paths": ["C:/MyProject/src"] } }
+   ```
+
+3. **서버 실행** (자세한 내용은 [실행](#실행) 참고)
+   ```powershell
+   python -m code_index          # stdio 모드
+   python -m code_index --http-port 6380  # HTTP 모드
+   ```
+
+4. **에디터 연동** 후 재시작 (자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고)
+   ```json
+   {
+     "servers": {
+       "CodeIndex": { "type": "stdio", "command": "python", "args": ["-m", "code_index"], "cwd": "E:/work/CodeIndex" }
+     }
+   }
+   ```
+---
+
 ## 설치
 
 ```powershell
-git clone https://github.com/your-repo/CodeIndex.git
+git clone https://github.com/ChoiIngon/CodeIndex.git
 cd CodeIndex
 ```
 

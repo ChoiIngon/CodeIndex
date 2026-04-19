@@ -1,7 +1,6 @@
 ﻿{
   "indexer": {
     "source_paths": [
-      "E:/work/CodeIndex/test/data"
     ],
     "extensions": [
       ".cpp",
