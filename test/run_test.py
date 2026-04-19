@@ -35,9 +35,11 @@ TEST_CASES = [
     ("서버 연결 실패 처리",             "HandleConnectionFailure", 5, "network.h"),
     ("아이템 드롭 확률 계산",           "CalculateDropRate",       5, "ItemDrop.cs"),
     ("오브젝트 풀 재사용",             "ObjectPool",              5, "object_pool.h"),
-    ("레벨업 이벤트 처리 보상",         "OnLevelUp",               5, "LevelSystem.cs"),
+    ("레벨업 이벤트 발생 및 보상 지급",   "OnLevelUp",               5, "LevelSystem.cs"),
     ("로그 출력 인터페이스",            "ILogger",                 5, "Logger.cs"),
     ("캐릭터 스탯 구조체 정의",         "CharacterStats",          5, "character_stats.h"),
+    # 청크 분할 테스트: 80라인 초과 심볼이 여러 청크로 분할되어도 검색 가능한지 확인
+    ("스킬 체인 처리 및 콤보 배율 계산", "ProcessSkillChain",        5, "skill_processor.cpp"),
 ]
 
 

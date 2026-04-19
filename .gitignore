@@ -1,5 +1,6 @@
 # 인덱스 데이터
 data/
+!test/data/
 
 # 모델 캐시
 .cache/

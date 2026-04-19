@@ -69,7 +69,6 @@ pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp se
 ## 설정
 
 `config/settings.json` 파일에서 인덱싱 대상 경로와 옵션을 설정합니다.
-"./test/data"는 실제 사용시 삭제해도 됩니다.
 
 ```json
 {
@@ -216,9 +215,13 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 
 ### stdio 모드 (기본 — 에디터 1개)
 
-에디터가 code_index를 자식 프로세스로 직접 실행합니다.
+에디터가 code_index를 자식 프로세스로 직접 실행합니다. 
+mcp 서버를 사용하는 에디터가 1개일 때 사용. 여러개 동시 사용시 뒤에 사용하는 mcp는 공유 파일 접근 불가 이슈로 자식 프로세스 생성 실패합니다.
+여러 에디터에서 동시에 mcp 서버에 접근하려면 HTTP 모드를 사용하십시오.
 
-**Claude Desktop** — `%APPDATA%\Claude\claude_desktop_config.json`
+**Claude Desktop** 
+- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
+- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Claude\claude_desktop_config.json`(`C:\Users\<사용자명>\AppData\Roaming\Claude\claude_desktop_config.json`) 
 ```json
 {
   "mcpServers": {
@@ -231,7 +234,9 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 }
 ```
 
-**VS Code** — `.vscode/mcp.json` (워크스페이스 전용) 또는 `%APPDATA%\Code\User\mcp.json` (전역)
+**VS Code**
+- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
+- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Code\User\mcp.json`(`C:\Users\<사용자명>\AppData\Roaming\Code\User\mcp.json`)
 ```json
 {
   "servers": {
@@ -245,7 +250,9 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 }
 ```
 
-**Visual Studio 2022** — `<솔루션폴더>\.mcp.json` (솔루션 전용, 소스컨트롤 추적 가능) 또는 `%USERPROFILE%\.mcp.json` (전역, `C:\Users\<사용자명>\.mcp.json`)
+**Visual Studio 2022**
+- 프로젝트 스코프(Local - 최우선 순위): `<솔루션폴더>\.mcp.json`
+- 유저 스코프(Global - 낮은 순위): `%USERPROFILE%\.mcp.json`(`C:\Users\<사용자명>\.mcp.json`)
 ```json
 {
   "servers": {
