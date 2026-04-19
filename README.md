@@ -159,7 +159,7 @@ pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp se
 | `alpha` | Dense/BM25 가중치. `1.0` = Dense 전용, `0.0` = BM25 전용, `0.5` = 균등 혼합 | `0.5` |
 | `use_reranker` | `true` 시 `models.rerank` 모델로 결과를 재정렬해 정확도 향상. 속도 소폭 저하 | `false` |
 
-### 최상위
+### 디버깅
 
 | 항목 | 설명 | 기본값 |
 |---|---|---|
