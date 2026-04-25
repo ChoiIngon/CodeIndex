@@ -23,6 +23,7 @@ class Chunk:
     namespace: str
     content: str
     content_hash: str
+    project_name: str = ""
 
 
 def make_chunk_id(file_path: str, start_line: int, end_line: int) -> str:
@@ -34,19 +35,29 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
-def chunk_file(file_path: str, cfg: dict) -> list[Chunk]:
+_EXT_LANG_MAP: dict[str, str] = {
+    ".h":   "cpp",
+    ".hpp": "cpp",
+    ".hxx": "cpp",
+    ".cxx": "cpp",
+    ".c":   "cpp",
+}
+
+
+def chunk_file(file_path: str, cfg: dict, project_name: str = "") -> list[Chunk]:
     """파일 하나를 청크 목록으로 변환."""
     min_lines = cfg.get("chunk_min_lines", 5)
     max_lines = cfg.get("chunk_max_lines", 150)
     overlap = cfg.get("chunk_overlap_lines", 10)
-    lang = Path(file_path).suffix.lstrip(".").lower()
+    suffix = Path(file_path).suffix.lower()
+    lang = _EXT_LANG_MAP.get(suffix, suffix.lstrip("."))
 
     symbols = parse_file(file_path)
 
     if symbols:
-        chunks = _chunk_from_symbols(file_path, lang, symbols, max_lines, overlap, min_lines)
+        chunks = _chunk_from_symbols(file_path, lang, symbols, max_lines, overlap, min_lines, project_name)
         return _deduplicate_chunks(chunks)
-    return _chunk_sliding_window(file_path, lang, max_lines, overlap, min_lines)
+    return _chunk_sliding_window(file_path, lang, max_lines, overlap, min_lines, project_name)
 
 
 # 심볼 우선순위: 높을수록 구체적 (중복 제거 시 우선 유지)
@@ -103,6 +114,7 @@ def _chunk_from_symbols(
     max_lines: int,
     overlap: int,
     min_lines: int,
+    project_name: str = "",
 ) -> list[Chunk]:
     chunks: list[Chunk] = []
     for sym in symbols:
@@ -130,6 +142,7 @@ def _chunk_from_symbols(
                 namespace=sym.namespace,
                 content=text,
                 content_hash=content_hash(text),
+                project_name=project_name,
             ))
         else:
             # 큰 심볼은 max_lines 단위로 분할 — 모든 청크에 (part N/M) 시그니처 유지
@@ -152,6 +165,7 @@ def _chunk_from_symbols(
                     namespace=sym.namespace,
                     content=text,
                     content_hash=content_hash(text),
+                    project_name=project_name,
                 ))
     return chunks
 
@@ -162,6 +176,7 @@ def _chunk_sliding_window(
     max_lines: int,
     overlap: int,
     min_lines: int,
+    project_name: str = "",
 ) -> list[Chunk]:
     """AST 파싱 실패 시 슬라이딩 윈도우 폴백."""
     try:
@@ -192,6 +207,7 @@ def _chunk_sliding_window(
             namespace="",
             content=text,
             content_hash=content_hash(text),
+            project_name=project_name,
         ))
     return chunks
 

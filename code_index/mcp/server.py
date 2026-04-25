@@ -18,7 +18,20 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
     if cfg is None:
         cfg = load_config()
 
-    from mcp.server.fastmcp import FastMCP
+    # Python 3.10 미만에서는 MCP 서버 지원 안함
+    if sys.version_info < (3, 10):
+        print(f"[Error] MCP 서버는 Python 3.10+ 에서만 지원됩니다. (현재: {sys.version})", file=sys.stderr)
+        print("[Error] 다음 옵션을 사용하세요:", file=sys.stderr)
+        print("  --index-only     : 인덱싱만 실행", file=sys.stderr)
+        print("  --search-code    : 코드 검색", file=sys.stderr)
+        print("  --query-batch    : 일괄 검색", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError:
+        print("[Error] MCP 패키지가 설치되지 않았습니다. Python 3.10+ 에서 'pip install mcp'로 설치하세요.", file=sys.stderr)
+        sys.exit(1)
 
     emb_cfg = cfg["embedding"]
     vs_cfg = cfg["vector_store"]
@@ -47,9 +60,22 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
 
     if http_port is not None:
         host = "127.0.0.1"
-        mcp_instance = FastMCP("CodeIndex", host=host, port=http_port)
+        # FastMCP를 stateless 모드로 설정하여 세션 ID 없이 동작하도록 수정
+        mcp_instance = FastMCP(
+            name="CodeIndex",
+            host=host,
+            port=http_port,
+            debug=_debug,
+            log_level="DEBUG" if _debug else "INFO",
+            stateless_http=True,  # AI 클라이언트 호환을 위한 stateless 모드
+            json_response=True    # JSON 응답 활성화
+        )
     else:
-        mcp_instance = FastMCP("CodeIndex")
+        mcp_instance = FastMCP(
+            name="CodeIndex",
+            debug=_debug,
+            log_level="DEBUG" if _debug else "INFO"
+        )
 
     mcp = mcp_instance
 
@@ -59,6 +85,7 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
         top_k: int = search_cfg.get("top_k", 20),
         language: str = "",
         symbol_type: str = "",
+        project: str = "",
     ) -> list[dict]:
         """코드베이스를 자연어 또는 심볼명으로 검색합니다.
 
@@ -67,9 +94,28 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
             top_k: 반환할 최대 결과 수 (기본값 20)
             language: 필터할 언어 (예: cpp, cs, 빈 문자열이면 전체)
             symbol_type: 필터할 심볼 타입 (예: function, class, method)
+            project: 필터할 프로젝트 이름 (예: GameServer, Middleware)
+        
+        사용 예시:
+        - 기본 검색: search_code("패킷 처리")
+        - 언어별 검색: search_code("CalculateDamage", language="cpp")
+        - 프로젝트별 검색: search_code("QA_Login serialize", project="GameServer")
+        - 프로젝트 간 비교: 
+          1) search_code("QA_Login serialize", project="GameServer")
+          2) search_code("QA_Login deserialize", project="Middleware")
+          결과를 비교하여 데이터 타입과 순서 일치 여부 확인
+        
+        반환값:
+        - chunk_id: 청크 고유 ID
+        - score: 검색 관련도 점수
+        - file_path: 파일 경로
+        - symbol_name, symbol_type: 심볼 정보
+        - start_line, end_line: 코드 라인 범위
+        - content: 코드 내용 (최대 1000자)
+        - project_name: 프로젝트 이름
         """
         if _logger:
-            _logger.log_input("search_code", {"query": query, "top_k": top_k, "language": language, "symbol_type": symbol_type})
+            _logger.log_input("search_code", {"query": query, "top_k": top_k, "language": language, "symbol_type": symbol_type, "project": project})
 
         query_vec = embedder.embed_query(query)
         filters: dict = {}
@@ -77,6 +123,8 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
             filters["language"] = language
         if symbol_type:
             filters["symbol_type"] = symbol_type
+        if project:
+            filters["project_name"] = project
 
         results = hybrid_search(
             query_vec=query_vec,
@@ -172,4 +220,5 @@ def _result_to_dict(r: SearchResult) -> dict:
         "parent_class": r.parent_class,
         "namespace": r.namespace,
         "content": r.content,
+        "project_name": r.project_name,
     }

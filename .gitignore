@@ -1,6 +1,8 @@
+# 설정 파일 (개인 환경 설정)
+config/settings.json
+
 # 인덱스 데이터
 data/
-!test/data/
 
 # 모델 캐시
 .cache/

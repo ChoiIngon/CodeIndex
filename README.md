@@ -6,6 +6,7 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 ## 특징
 
 - 외부 API 키 불필요 — 임베딩 모델을 최초 실행 시 HuggingFace에서 자동 다운로드
+- **프로젝트별 필터링** — 여러 프로젝트를 동시에 인덱싱하고 검색 시 특정 프로젝트로 범위 제한
 - Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합
 - SHA-256 기반 증분 인덱싱 — 변경된 파일만 재처리
 - GPU 자동 감지 및 CUDA wheel 자동 설치
@@ -17,7 +18,9 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 
 - Python 3.11+
 - NVIDIA GPU 권장 (CPU 동작 가능, 속도 저하)
-- CUDA 11.8 이상 (GPU 사용 시)
+- CUDA 11.8+ 또는 12.x (GPU 사용 시)
+
+> **GPU 호환성**: RTX 3050/3060/4090 등 대부분의 NVIDIA GPU 지원. CUDA 12.4 환경에서는 PyTorch 안정 버전(2.5.x) 자동 설치됩니다.
 
 ---
 
@@ -29,9 +32,24 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
    cd CodeIndex
    ```
 
-2. **경로 설정** — `config/settings.json`의 `indexer.source_paths`에 인덱싱할 경로 추가 (자세한 내용은 [설정](#설정) 참고)
+2. **경로 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
    ```json
-   { "indexer": { "source_paths": ["C:/MyProject/src"] } }
+   { 
+     "indexer": { 
+       "GameClient": { 
+         "source_paths": ["C:/MyProject/Client/Assets"], // 실제 경로로 변경
+         "extensions": [".cs"]
+       },
+       "GameServer": { 
+         "source_paths": ["C:/MyProject/Server/src"],
+         "extensions": [".cpp", ".h", ".c"]
+       },
+       "Middleware": { 
+         "source_paths": ["C:/MyProject/Middleware/src"],
+         "extensions": [".cs"]
+       }
+     }
+   }
    ```
 
 3. **서버 실행** (자세한 내용은 [실행](#실행) 참고)
@@ -57,29 +75,33 @@ git clone https://github.com/ChoiIngon/CodeIndex.git
 cd CodeIndex
 ```
 
-의존성은 첫 실행 시 자동 설치됩니다. 수동 설치가 필요하면:
+**의존성은 첫 실행 시 자동 설치됩니다.** GPU가 감지되면 적절한 PyTorch 버전을 자동 선택합니다.
 
-```powershell
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp sentencepiece einops
-```
+> **참고**: GPU 환경에서는 CUDA 11.8+ 또는 12.x에 맞는 PyTorch 안정 버전이 자동 설치됩니다. 설치 실패 시 CPU 버전으로 폴백됩니다.
 
 ---
 
 ## 설정
 
-`config/settings.json` 파일에서 인덱싱 대상 경로와 옵션을 설정합니다.
+`config/settings.json` 파일에서 프로젝트별 인덱싱 설정을 관리합니다.
 
 ```json
 {
   "indexer": {
-    "source_paths": ["C:/MyProject/src", "./test/data"],
-    "extensions": [".cpp", ".h", ".c", ".cs"],
-    "exclude_patterns": ["*/build/*", "*/.git/*", "*/generated/*"],
     "chunk_min_lines": 5,
     "chunk_max_lines": 80,
     "chunk_overlap_lines": 10,
-    "chunk_workers": 0
+    "chunk_workers": 0,
+    "GameServer": {
+      "source_paths": ["C:/MyProject/Server"],
+      "extensions": [".cpp", ".h", ".c"],
+      "exclude_patterns": ["*/build/*", "*/.git/*", "*/Utility/*"]
+    },
+    "GameClient": {
+      "source_paths": ["C:/MyProject/Client/Assets"],
+      "extensions": [".cs"],
+      "exclude_patterns": ["*/Library/*", "*/Packages/*"]
+    }
   },
   "models": {
     "cache_dir": "",
@@ -111,15 +133,35 @@ pip install qdrant-client tree-sitter tree-sitter-cpp tree-sitter-c-sharp mcp se
 
 ### indexer
 
+**구조**: `"indexer": { "chunk_설정...", "ProjectName": { ... }, "AnotherProject": { ... } }`
+
+#### 공유 청킹 설정 (모든 프로젝트 적용)
+
 | 항목 | 설명 | 기본값 |
 |---|---|---|
-| `source_paths` | 인덱싱할 소스 경로 목록. 절대 경로 또는 프로젝트 루트 기준 상대 경로 | `[]` |
-| `extensions` | 인덱싱 대상 확장자 목록 | `[".cpp", ".h", ".c", ".cs"]` |
-| `exclude_patterns` | 제외할 경로 패턴 (glob). `*/build/*` 등 빌드 산출물 제외에 사용 | `["*/build/*", "*/.git/*", "*/generated/*"]` |
 | `chunk_min_lines` | 이 값 미만의 라인 수를 가진 심볼은 청크에서 제외 | `5` |
 | `chunk_max_lines` | 청크 최대 라인 수. 초과 시 overlap을 유지하며 분할 | `80` |
 | `chunk_overlap_lines` | 분할된 청크 간 중복 라인 수. 컨텍스트 연속성 유지 | `10` |
 | `chunk_workers` | 청킹 병렬 프로세스 수. `0` = CPU 코어 수의 절반 자동 사용 | `0` |
+
+#### 프로젝트별 개별 설정
+
+각 프로젝트별로 독립적인 설정을 가질 수 있습니다:
+
+| 항목 | 설명 | 기본값 |
+|---|---|---|
+| `source_paths` | 해당 프로젝트의 인덱싱 소스 경로 목록. 절대/상대 경로 | `[]` |
+| `extensions` | 해당 프로젝트의 인덱싱 대상 확장자 목록 | `[".cpp", ".h", ".c", ".cs"]` |
+| `exclude_patterns` | 해당 프로젝트의 제외 경로 패턴 (glob) | `["*/build/*", "*/.git/*", "*/generated/*"]` |
+
+**예제**:
+- `GameServer`: C++ 파일만, Utility 폴더 제외  
+- `Middleware`: C# 파일만, Unity 관련 폴더 제외
+
+**프로젝트별 필터링 활용 사례**:
+- 패킷 호환성 검증: GameServer의 serialize와 Middleware의 deserialize 비교
+- 언어별 코딩 패턴 분석: C++ vs C# 구현 방식 차이점 파악  
+- 프로젝트 간 API 일관성 체크: 공통 모듈의 인터페이스 구현 검증
 
 ### models
 
@@ -201,6 +243,13 @@ python -m code_index --search-code "데미지 계산 로직"
 
 # 필터 옵션
 python -m code_index --search-code "CalculateDamage" --top-k 10 --language cpp --symbol-type function
+
+# 프로젝트별 검색 (GameServer 프로젝트에서만 검색)
+python -m code_index --search-code "QA_Login serialize" --project "GameServer" --top-k 5
+
+# 프로젝트 간 비교 분석 예시
+python -m code_index --search-code "QA_Login serialize" --project "GameServer" --top-k 3
+python -m code_index --search-code "QA_Login deserialize" --project "Middleware" --top-k 3
 
 # 파일 심볼 목록
 python -m code_index --get-file-outline "combat.cpp"
@@ -306,7 +355,7 @@ AI 클라이언트가 호출할 수 있는 도구입니다.
 
 | 도구 | 설명 | 주요 파라미터 |
 |---|---|---|
-| `search_code` | 자연어/심볼명으로 코드 청크 검색 | `query`, `top_k`, `language`, `symbol_type` |
+| `search_code` | 자연어/심볼명으로 코드 청크 검색 | `query`, `top_k`, `language`, `symbol_type`, `project` |
 | `get_file_outline` | 파일의 심볼 목록(클래스/함수/메서드) 반환 | `file_path` |
 | `get_chunk` | 청크 ID로 코드 전문 조회 | `chunk_id` |
 

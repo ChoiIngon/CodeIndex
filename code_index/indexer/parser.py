@@ -24,7 +24,7 @@ def parse_file(file_path: str) -> list[ParsedSymbol]:
     except OSError:
         return []
 
-    if suffix in (".cpp", ".c", ".h"):
+    if suffix in (".cpp", ".c", ".h", ".hpp", ".hxx", ".cxx"):
         return _parse_cpp(source, file_path)
     elif suffix == ".cs":
         return _parse_cs(source, file_path)

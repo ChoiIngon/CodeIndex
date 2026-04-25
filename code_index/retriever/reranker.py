@@ -41,7 +41,7 @@ class Reranker:
                 start_line=r.start_line, end_line=r.end_line,
                 symbol_type=r.symbol_type, symbol_name=r.symbol_name,
                 parent_class=r.parent_class, namespace=r.namespace,
-                content=r.content,
+                content=r.content, project_name=r.project_name,
             )
             for s, r in ranked[:top_k]
         ]

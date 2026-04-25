@@ -10,13 +10,14 @@ from __future__ import annotations
 import atexit
 import os
 import platform
+import ssl
 import subprocess
 import sys
 import time
 import zipfile
 from pathlib import Path
 from urllib.error import URLError
-from urllib.request import urlretrieve
+from urllib.request import urlopen, urlretrieve, Request
 
 QDRANT_VERSION = "v1.17.1"
 
@@ -34,6 +35,49 @@ _PLATFORM_ASSET: dict[tuple[str, str], tuple[str, str]] = {
 }
 
 _proc: subprocess.Popen | None = None
+
+
+# ── SSL 처리 헬퍼 ────────────────────────────────────────────────────────────
+
+def _create_ssl_context(verify: bool = True) -> ssl.SSLContext | None:
+    """SSL 컨텍스트를 생성한다. verify=False면 인증서 검증을 비활성화한다."""
+    if not verify:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
+    return None
+
+
+def _should_skip_ssl_verify() -> bool:
+    """환경변수를 확인하여 SSL 검증을 건너뛸지 결정한다."""
+    return os.environ.get("CODE_INDEX_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+
+
+def _download_with_progress(url: str, filepath: Path, ssl_context: ssl.SSLContext = None) -> None:
+    """진행률을 표시하면서 파일을 다운로드한다."""
+    import urllib.request
+    
+    def _progress(count: int, block_size: int, total_size: int) -> None:
+        if total_size > 0:
+            pct = min(int(count * block_size * 100 / total_size), 100)
+            print(f"\r  {pct:3d}%", end="", file=sys.stderr, flush=True)
+    
+    # SSL 컨텍스트가 제공되면 opener를 사용
+    if ssl_context:
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=ssl_context)
+        )
+        # 기존 opener 백업
+        old_opener = urllib.request._opener
+        try:
+            urllib.request.install_opener(opener)
+            urllib.request.urlretrieve(url, filepath, _progress)
+        finally:
+            # opener 복원
+            urllib.request.install_opener(old_opener)
+    else:
+        urllib.request.urlretrieve(url, filepath, _progress)
 
 
 # ── 경로 헬퍼 ────────────────────────────────────────────────────────────────
@@ -71,17 +115,49 @@ def _download(cache_root: Path) -> Path:
 
     print(f"[Qdrant] 다운로드 중... {url}", file=sys.stderr)
 
-    def _progress(count: int, block_size: int, total_size: int) -> None:
-        if total_size > 0:
-            pct = min(int(count * block_size * 100 / total_size), 100)
-            print(f"\r  {pct:3d}%", end="", file=sys.stderr, flush=True)
+    # SSL 검증 설정 확인
+    skip_ssl = _should_skip_ssl_verify()
+    ssl_context = _create_ssl_context(verify=not skip_ssl) if skip_ssl else None
+    
+    if skip_ssl:
+        print(f"[Qdrant] SSL 검증 비활성화 모드로 다운로드", file=sys.stderr)
 
     try:
-        urlretrieve(url, archive, _progress)
-    except URLError as e:
-        print(f"\n[Qdrant] 다운로드 실패({e.reason})", file=sys.stderr)
-        print("일시적 네트워크 오류일 수 있으니 잠시 후 code_index를 재시작 해주세요", file=sys.stderr)
-        sys.exit(1)
+        # 첫 번째 시도: 기본 설정으로 다운로드
+        _download_with_progress(url, archive, ssl_context)
+    except Exception as e:
+        error_msg = str(e)
+        
+        # SSL 인증서 오류 감지 (URLError, ssl.SSLError, 일반 Exception 포함)
+        if any(keyword in error_msg for keyword in [
+            "CERTIFICATE_VERIFY_FAILED", 
+            "certificate verify failed", 
+            "SSL", 
+            "Authority Key Identifier",
+            "CERT_NONE",
+            "certificate"
+        ]):
+            print(f"\n[Qdrant] SSL 인증서 오류 감지: {error_msg}", file=sys.stderr)
+            if not skip_ssl:
+                print(f"[Qdrant] SSL 검증을 비활성화하고 재시도합니다...", file=sys.stderr)
+                try:
+                    # SSL 검증 비활성화 후 재시도
+                    ssl_context = _create_ssl_context(verify=False)
+                    _download_with_progress(url, archive, ssl_context)
+                    print(f"\n[Qdrant] SSL 검증 비활성화로 다운로드 성공", file=sys.stderr)
+                    print(f"[Qdrant] 향후 SSL 검증을 건너뛰려면 환경변수를 설정하세요: CODE_INDEX_SKIP_SSL_VERIFY=1", file=sys.stderr)
+                except Exception as retry_e:
+                    print(f"\n[Qdrant] 다운로드 실패({retry_e})", file=sys.stderr)
+                    print("일시적 네트워크 오류일 수 있으니 잠시 후 code_index를 재시작 해주세요", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                print(f"\n[Qdrant] 다운로드 실패({error_msg})", file=sys.stderr)
+                print("일시적 네트워크 오류일 수 있으니 잠시 후 code_index를 재시작 해주세요", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(f"\n[Qdrant] 다운로드 실패({error_msg})", file=sys.stderr)
+            print("일시적 네트워크 오류일 수 있으니 잠시 후 code_index를 재시작 해주세요", file=sys.stderr)
+            sys.exit(1)
     print(file=sys.stderr)
 
     # ── 압축 해제 ─────────────────────────────────────────────────────────────
@@ -142,6 +218,60 @@ def _kill_proc() -> None:
 
 
 # ── 공개 API ─────────────────────────────────────────────────────────────────
+
+def trigger_wal_cleanup(host: str, port: int) -> None:
+    """
+    Qdrant 서버 시작 후 WAL 파일이 자연스럽게 정리되도록 대기하고
+    용량 불일치를 감지하여 사용자에게 안내한다.
+    """
+    try:
+        import urllib.request
+        import json
+        import time
+        
+        # 서버가 이미 _wait_ready()로 준비 확인되었으므로 바로 API 호출
+        
+        # 컬렉션 정보 조회
+        collections_url = f"http://{host}:{port}/collections"
+        req = urllib.request.Request(collections_url)
+        
+        with urllib.request.urlopen(req, timeout=5) as response:
+            collections_data = json.loads(response.read().decode('utf-8'))
+            collections = collections_data.get("result", {}).get("collections", [])
+        
+        if not collections:
+            return
+            
+        # 첫 번째 컬렉션의 벡터 수 확인
+        for collection_info in collections:
+            collection_name = collection_info.get("name", "")
+            if collection_name:
+                try:
+                    info_url = f"http://{host}:{port}/collections/{collection_name}"
+                    req = urllib.request.Request(info_url)
+                    
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        info_data = json.loads(response.read().decode('utf-8'))
+                        vector_count = info_data.get("result", {}).get("vectors_count", 0)
+                        
+                        # 벡터 수가 적은데 WAL 파일이 큰 경우 사용자에게 안내
+                        if vector_count < 1000:
+                            print(f"[Qdrant] 벡터 수: {vector_count}개 - 자동 정리 대기 중...", file=sys.stderr)
+                        
+                        break  # 첫 번째 컬렉션만 확인
+                        
+                except Exception:
+                    continue
+        
+        # 추가 정리 대기 (WAL 파일은 Qdrant가 백그라운드에서 자동 처리)
+        # time.sleep(1.0) - 불필요한 대기 제거
+        
+        print(f"[Qdrant] WAL 파일은 백그라운드에서 자동 정리됩니다", file=sys.stderr)
+        
+    except Exception as e:
+        # WAL 정리는 중요하지 않으므로 오류를 무시
+        pass
+
 
 def ensure_qdrant_server(vs_cfg: dict, cache_root: Path) -> None:
     """

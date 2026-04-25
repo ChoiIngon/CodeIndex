@@ -20,6 +20,7 @@ class SearchResult:
     parent_class: str
     namespace: str
     content: str
+    project_name: str = ""
 
 
 def hybrid_search(
@@ -37,7 +38,7 @@ def hybrid_search(
     dense_ids = [h.chunk_id for h in dense_hits]
 
     # BM25 검색 (FTS5)
-    bm25_hits = _safe_bm25(metadata, query_text, top_k * 2)
+    bm25_hits = _safe_bm25(metadata, query_text, top_k * 2, filters)
     bm25_ids = [h[0] for h in bm25_hits]
 
     # RRF 퓨전
@@ -64,13 +65,14 @@ def hybrid_search(
             parent_class=chunk.parent_class,
             namespace=chunk.namespace,
             content=chunk.content,
+            project_name=chunk.project_name,
         ))
     return results
 
 
-def _safe_bm25(metadata: MetadataStore, query: str, top_k: int) -> list:
+def _safe_bm25(metadata: MetadataStore, query: str, top_k: int, filters: Optional[dict] = None) -> list:
     try:
-        return metadata.bm25_search(query, top_k)
+        return metadata.bm25_search(query, top_k, filters)
     except Exception:
         return []
 
