@@ -79,19 +79,45 @@ def _walk_cpp(node, lines: list, symbols: list, namespace: str, parent_class: st
         name = _extract_cpp_func_name(node, lines)
         start = node.start_point[0]
         end = node.end_point[0]
+        # "Class::Method" 처럼 한정자가 있으면 클래스 멤버 구현으로 판단
+        raw_parent = parent_class
+        if not raw_parent and "::" in name:
+            parts = name.rsplit("::", 1)
+            raw_parent = parts[0].split("::")[-1]
         full_name = f"{parent_class}::{name}" if parent_class else name
         if namespace:
             full_name = f"{namespace}::{full_name}"
         symbols.append(ParsedSymbol(
-            symbol_type="method" if parent_class else "function",
+            symbol_type="method" if raw_parent else "function",
             symbol_name=full_name,
-            parent_class=parent_class,
+            parent_class=raw_parent,
             namespace=namespace,
             start_line=start + 1,
             end_line=end + 1,
             content="\n".join(lines[start:end + 1]),
         ))
         return
+
+    # 헤더 파일의 메서드/함수 선언 (function_definition 이 아닌 declaration 노드)
+    if node.type in ("declaration", "field_declaration"):
+        decl_node = _find_function_declarator(node)
+        if decl_node:
+            name = _extract_cpp_func_name(decl_node, lines)
+            start = node.start_point[0]
+            end = node.end_point[0]
+            full_name = f"{parent_class}::{name}" if parent_class else name
+            if namespace:
+                full_name = f"{namespace}::{full_name}"
+            symbols.append(ParsedSymbol(
+                symbol_type="method" if parent_class else "function",
+                symbol_name=full_name,
+                parent_class=parent_class,
+                namespace=namespace,
+                start_line=start + 1,
+                end_line=end + 1,
+                content="\n".join(lines[start:end + 1]),
+            ))
+            return
 
     for child in node.children:
         _walk_cpp(child, lines, symbols, namespace=namespace, parent_class=parent_class)
@@ -105,13 +131,31 @@ def _cpp_child_text(node, child_type: str, lines: list) -> str:
     return "unknown"
 
 
+def _find_function_declarator(node):
+    """declaration 서브트리에서 function_declarator 노드를 반환."""
+    if node.type == "function_declarator":
+        return node
+    for child in node.children:
+        found = _find_function_declarator(child)
+        if found:
+            return found
+    return None
+
+
 def _extract_cpp_func_name(node, lines: list) -> str:
     for child in node.children:
-        if child.type in ("function_declarator", "pointer_declarator"):
+        if child.type in ("function_declarator", "pointer_declarator", "reference_declarator"):
             return _extract_cpp_func_name(child, lines)
-        if child.type in ("qualified_identifier", "identifier"):
+        if child.type in ("qualified_identifier", "identifier", "field_identifier"):
             s, e = child.start_point[0], child.end_point[0]
             return lines[s][child.start_point[1]:child.end_point[1]] if s == e else lines[s]
+        if child.type == "destructor_name":
+            # ~ClassName 형태: 내부 identifier 추출
+            for gc in child.children:
+                if gc.type == "identifier":
+                    s, e = gc.start_point[0], gc.end_point[0]
+                    name = lines[s][gc.start_point[1]:gc.end_point[1]] if s == e else lines[s]
+                    return f"~{name}"
     return "unknown"
 
 

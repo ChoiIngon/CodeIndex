@@ -4,14 +4,14 @@ import os
 import sys
 from typing import Optional
 
-from ..config import load_config
-from ..indexer.embedder import Embedder
-from ..models.model_manager import resolve_model
-from ..retriever.hybrid_search import SearchResult, hybrid_search
-from ..store.cache import EmbedCache
-from ..store.metadata_store import MetadataStore
-from ..store.vector_store import VectorStore
-from .debug_logger import DebugLogger
+from code_index.config import load_config
+from code_index.indexer.embedder import Embedder
+from code_index.models.model_manager import resolve_model
+from code_index.retriever.hybrid_search import SearchResult, hybrid_search
+from code_index.store.cache import EmbedCache
+from code_index.store.metadata_store import MetadataStore
+from code_index.store.vector_store import VectorStore
+from code_index.mcp.debug_logger import DebugLogger
 
 
 def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) -> None:

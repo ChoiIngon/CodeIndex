@@ -297,6 +297,119 @@ class CodeIndexProcess:
             print(f"[오류] 응답 파싱 실패: {e}", file=sys.stderr)
             return None
 
+    def get_file_outline(
+        self,
+        file_path: str,
+        timeout: float = 30.0,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """MCP 서버의 get_file_outline 툴을 호출합니다.
+
+        Args:
+            file_path: 아웃라인을 가져올 파일의 절대 경로 또는 경로 일부 (부분 매칭 지원).
+            timeout:   응답 대기 시간(초).
+
+        Returns:
+            심볼 dict 리스트. 실패 시 None.
+        """
+        req_id = self._next_id()
+
+        if not self._send({
+            "jsonrpc": _JSONRPC_VERSION,
+            "id": req_id,
+            "method": "tools/call",
+            "params": {
+                "name": "get_file_outline",
+                "arguments": {
+                    "file_path": file_path,
+                },
+            },
+        }):
+            return None
+
+        resp = self._recv(req_id, timeout=timeout)
+        if resp is None:
+            print("[오류] get_file_outline 응답 타임아웃", file=sys.stderr)
+            return None
+        if "error" in resp:
+            print(f"[오류] get_file_outline 오류: {resp['error']}", file=sys.stderr)
+            return None
+
+        try:
+            content = resp.get("result", {}).get("content", [])
+            results = []
+            for entry in content:
+                text = entry.get("text", "")
+                if text.startswith("Error"):
+                    print(f"[오류] 서버 오류: {text[:300]}", file=sys.stderr)
+                    return None
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        results.extend(parsed)
+                    elif isinstance(parsed, dict):
+                        results.append(parsed)
+                except json.JSONDecodeError:
+                    pass
+            return results
+        except Exception as e:
+            print(f"[오류] 응답 파싱 실패: {e}", file=sys.stderr)
+            return None
+
+    def get_chunk(
+        self,
+        chunk_id: str,
+        timeout: float = 30.0,
+    ) -> Optional[Dict[str, Any]]:
+        """MCP 서버의 get_chunk 툴을 호출합니다.
+
+        Args:
+            chunk_id: 조회할 청크의 UUID.
+            timeout:  응답 대기 시간(초).
+
+        Returns:
+            청크 dict. 실패 또는 존재하지 않을 경우 None.
+        """
+        req_id = self._next_id()
+
+        if not self._send({
+            "jsonrpc": _JSONRPC_VERSION,
+            "id": req_id,
+            "method": "tools/call",
+            "params": {
+                "name": "get_chunk",
+                "arguments": {
+                    "chunk_id": chunk_id,
+                },
+            },
+        }):
+            return None
+
+        resp = self._recv(req_id, timeout=timeout)
+        if resp is None:
+            print("[오류] get_chunk 응답 타임아웃", file=sys.stderr)
+            return None
+        if "error" in resp:
+            print(f"[오류] get_chunk 오류: {resp['error']}", file=sys.stderr)
+            return None
+
+        try:
+            content = resp.get("result", {}).get("content", [])
+            for entry in content:
+                text = entry.get("text", "")
+                if text.startswith("Error"):
+                    print(f"[오류] 서버 오류: {text[:300]}", file=sys.stderr)
+                    return None
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except json.JSONDecodeError:
+                    pass
+            return None
+        except Exception as e:
+            print(f"[오류] 응답 파싱 실패: {e}", file=sys.stderr)
+            return None
+
     # ── 종료 및 상태 ─────────────────────────────────────────────────────────
 
     def kill(self) -> bool:

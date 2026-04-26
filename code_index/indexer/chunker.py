@@ -97,6 +97,10 @@ def _deduplicate_chunks(chunks: list[Chunk]) -> list[Chunk]:
                 existing.start_line, existing.end_line,
             )
             if ratio >= 0.8:
+                # 클래스/구조체가 자신의 멤버(method)에 의해 제거되지 않도록 예외 처리
+                if (existing.parent_class
+                        and candidate.symbol_type in ("class", "struct", "interface")):
+                    continue
                 # 같은 우선순위면 둘 다 유지, 더 추상적이면 제거
                 if (_SYMBOL_PRIORITY.get(candidate.symbol_type, 4)
                         > _SYMBOL_PRIORITY.get(existing.symbol_type, 4)):
@@ -119,7 +123,8 @@ def _chunk_from_symbols(
     chunks: list[Chunk] = []
     for sym in symbols:
         lines = sym.content.splitlines()
-        if len(lines) < min_lines:
+        # 클래스 멤버(선언 포함)는 min_lines 필터 적용 안 함
+        if len(lines) < min_lines and not sym.parent_class:
             continue
 
         # 헤더: class 컨텍스트 포함
