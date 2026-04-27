@@ -299,9 +299,10 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 	}
 }
 ```
-- 프로젝트 스코프(Local - 최우선 순위): `<솔루션폴더>\.mcp.json`
-- 유저 스코프(Global - 낮은 순위): `%USERPROFILE%\.mcp.json`(`C:\Users\<사용자명>\.mcp.json`)
-
+- 프로젝트 스코프: `<솔루션폴더>\.vs\mcp.json`
+- 유저 스코프: `%USERPROFILE%\.mcp.json` - (`C:\Users\<사용자명>\.mcp.json`)
+- vscode 호환: `<솔루션폴더>\.vscode\mcp.json`
+- cursor 호환: `<솔루션폴더>\.cursor\mcp.json`
 
 ### HTTP 모드 (에디터 여러 개 동시 사용)
 
