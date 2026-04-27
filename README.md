@@ -32,7 +32,7 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
    cd CodeIndex
    ```
 
-2. **경로 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
+2. **인덱싱 대상 경로 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
    ```json
    { 
      "indexer": { 
@@ -52,21 +52,7 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
    }
    ```
 
-3. **서버 실행** (자세한 내용은 [실행](#실행) 참고)
-   ```powershell
-   python -m code_index          # stdio 모드
-   python -m code_index --http-port 6380  # HTTP 모드
-   ```
-
-4. **에디터 연동** 후 재시작 (자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고)
-   ```json
-   {
-     "servers": {
-       "CodeIndex": { "type": "stdio", "command": "python", "args": ["-m", "code_index"], "cwd": "E:/work/CodeIndex" }
-     }
-   }
-   ```
----
+3. **MCP 서버 실행 및 에디터 연동** (자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고)
 
 ## 설치
 
@@ -264,13 +250,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 
 ### stdio 모드 (기본 — 에디터 1개)
 
-에디터가 code_index를 자식 프로세스로 직접 실행합니다. 
-mcp 서버를 사용하는 에디터가 1개일 때 사용. 여러개 동시 사용시 뒤에 사용하는 mcp는 공유 파일 접근 불가 이슈로 자식 프로세스 생성 실패합니다.
-여러 에디터에서 동시에 mcp 서버에 접근하려면 HTTP 모드를 사용하십시오.
-
 **Claude Desktop** 
-- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
-- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Claude\claude_desktop_config.json`(`C:\Users\<사용자명>\AppData\Roaming\Claude\claude_desktop_config.json`) 
 ```json
 {
   "mcpServers": {
@@ -282,38 +262,45 @@ mcp 서버를 사용하는 에디터가 1개일 때 사용. 여러개 동시 사
   }
 }
 ```
+- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
+- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Claude\claude_desktop_config.json`(`C:\Users\<사용자명>\AppData\Roaming\Claude\claude_desktop_config.json`) 
 
 **VS Code**
+```json
+{
+	"servers": {
+		"CodeIndex": {
+			"type": "stdio",
+			"command": "python",
+			"args": [ "-m", "code_index" ],
+			"env": {
+				"PYTHONPATH": "E:\\work\\CodeIndex"
+			}
+		}
+	}
+}
+```
 - 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
 - 유저 스코프(Global - 낮은 순위): `%APPDATA%\Code\User\mcp.json`(`C:\Users\<사용자명>\AppData\Roaming\Code\User\mcp.json`)
-```json
-{
-  "servers": {
-    "CodeIndex": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["-m", "code_index"],
-      "cwd": "E:/work/CodeIndex"
-    }
-  }
-}
-```
 
 **Visual Studio 2022**
-- 프로젝트 스코프(Local - 최우선 순위): `<솔루션폴더>\.mcp.json`
-- 유저 스코프(Global - 낮은 순위): `%USERPROFILE%\.mcp.json`(`C:\Users\<사용자명>\.mcp.json`)
 ```json
 {
-  "servers": {
-    "CodeIndex": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["-m", "code_index"],
-      "cwd": "E:/work/CodeIndex"
-    }
-  }
+	"servers": {
+		"CodeIndex": {
+			"type": "stdio",
+			"command": "python",
+			"args": [ "-m", "code_index" ],
+			"env": {
+				"PYTHONPATH": "E:\\work\\CodeIndex"
+			}
+		}
+	}
 }
 ```
+- 프로젝트 스코프(Local - 최우선 순위): `<솔루션폴더>\.mcp.json`
+- 유저 스코프(Global - 낮은 순위): `%USERPROFILE%\.mcp.json`(`C:\Users\<사용자명>\.mcp.json`)
+
 
 ### HTTP 모드 (에디터 여러 개 동시 사용)
 
