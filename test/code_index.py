@@ -12,12 +12,38 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 ROOT = Path(__file__).parent.parent.resolve()
 
 _JSONRPC_VERSION = "2.0"
 _MCP_PROTOCOL_VERSION = "2024-11-05"
+
+
+class SearchResult:
+    """search_code() 결과를 담는 컨테이너."""
+
+    def __init__(self, results: List[Dict[str, Any]]) -> None:
+        self.results = results
+
+    def hit(self, expected: str) -> Tuple[bool, int]:
+        """결과에서 예상 심볼이 발견되는지 확인합니다."""
+        for i, r in enumerate(self.results):
+            symbol_name = r.get("symbol_name", "").lower()
+            content = r.get("content", "").lower()
+            expected_lower = expected.lower()
+            if expected_lower in symbol_name or expected_lower in content:
+                return True, i + 1
+        return False, -1
+
+    def __len__(self) -> int:
+        return len(self.results)
+
+    def __iter__(self):
+        return iter(self.results)
+
+    def __bool__(self) -> bool:
+        return bool(self.results)
 
 
 class CodeIndexProcess:
@@ -29,6 +55,7 @@ class CodeIndexProcess:
         self._req_id = 0
         self._stdout_q: queue.Queue = queue.Queue()
         self.last_stderr: str = ""  # 마지막 실행의 stderr 출력 (wait=True 시)
+        self.last_stdout: str = ""  # 마지막 실행의 stdout 출력 (wait=True 시)
 
     # ── 실행 ─────────────────────────────────────────────────────────────────
 
@@ -36,16 +63,17 @@ class CodeIndexProcess:
         self,
         options: Union[str, List[str], None] = None,
         wait: bool = True,
-    ) -> Optional[int]:
+    ) -> Any:
         """'python -m code_index {options}' 를 자식 프로세스로 실행합니다.
 
         Args:
             options: 전달할 옵션. 예) "--index-only" 또는 ["--search", "query"]
-            wait:    True  → 종료까지 대기 후 returncode 반환.
+            wait:    True  → 종료까지 대기 후 (returncode, stdout) 튜플 반환.
                      False → MCP stdio 핸드셰이크 완료 후 PID 반환.
 
         Returns:
-            wait=True  → returncode. wait=False → PID. 실패 시 None.
+            wait=True  → (returncode, stdout) 튜플. 실패 시 (None, "").
+            wait=False → PID. 실패 시 None.
         """
         cmd = [sys.executable, "-m", "code_index"]
         if options:
@@ -68,18 +96,21 @@ class CodeIndexProcess:
             )
         except Exception as e:
             print(f"[오류] 프로세스 시작 실패: {e}", file=sys.stderr)
+            if wait:
+                return None, ""
             return None
 
         self.pid = self._process.pid
 
         if wait:
             # communicate()로 stdout/stderr를 모두 소비 — 파이프 버퍼 블록 방지
-            _, stderr_out = self._process.communicate()
+            stdout_out, stderr_out = self._process.communicate()
+            self.last_stdout = stdout_out or ""
             self.last_stderr = stderr_out or ""
             rc = self._process.returncode
             self._process = None
             self.pid = None
-            return rc
+            return rc, self.last_stdout
 
         # ── MCP stdio 모드 ────────────────────────────────────────────────
         # stderr 드레인: 파이프 버퍼가 꽉 차 서버가 블록되는 것을 방지
@@ -93,7 +124,7 @@ class CodeIndexProcess:
         if not self._mcp_handshake(timeout=300.0):
             print("[오류] MCP 핸드셰이크 실패", file=sys.stderr)
             self.kill()
-            return None
+            return None  # wait=False 경로
 
         return self.pid
 
@@ -233,7 +264,7 @@ class CodeIndexProcess:
         symbol_type: str = "",
         project: str = "",
         timeout: float = 30.0,
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[SearchResult]:
         """MCP 서버의 search_code 툴을 호출합니다.
 
         Args:
@@ -245,7 +276,7 @@ class CodeIndexProcess:
             timeout:     응답 대기 시간(초).
 
         Returns:
-            검색 결과 dict 리스트. 실패 시 None.
+            SearchResult 인스턴스. 실패 시 None.
         """
         req_id = self._next_id()
 
@@ -292,7 +323,7 @@ class CodeIndexProcess:
                         results.append(parsed)
                 except json.JSONDecodeError:
                     pass
-            return results
+            return SearchResult(results)
         except Exception as e:
             print(f"[오류] 응답 파싱 실패: {e}", file=sys.stderr)
             return None
