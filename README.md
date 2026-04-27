@@ -248,7 +248,8 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 
 ## MCP 에디터 연동
 
-### stdio 모드 (기본 — 에디터 1개)
+### stdio 모드
+사용 환경에 따라 적절한 디렉토리에 아래 처럼 mcp.json을 작성 후 에디터 재시작합니다.
 
 **Claude Desktop** 
 ```json
