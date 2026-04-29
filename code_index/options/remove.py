@@ -34,15 +34,14 @@ def remove() -> None:
     _model_cfg = _settings.get("models", {})
 
     # ── 인덱스 데이터 경로 계산 ──────────────────────────────────────────────
-    _data_dir = Path(_vs_cfg.get("data_path", constants.DEFAULT_PATHS["data_dir"]))
+    _data_dir = Path(_vs_cfg.get("data_dir", constants.DEFAULT_PATHS["data_dir"]))
     if not _data_dir.is_absolute():
         _data_dir = (Path(__file__).parent.parent.parent / _data_dir).resolve()
-    _data_parent = _data_dir.parent
 
     _index_paths = [
-        _data_dir,
-        _data_parent / "metadata.db",
-        _data_parent / "embed_cache.db",
+        _data_dir / "qdrant",
+        _data_dir / "metadata.db",
+        _data_dir / "embed_cache.db",
     ]
 
     print("[Remove] 인덱스 데이터 삭제 중...", file=sys.stderr)

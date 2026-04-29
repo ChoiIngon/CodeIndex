@@ -19,6 +19,8 @@ from qdrant_client.models import (
     ScoredPoint,
 )
 
+from code_index import constants
+
 
 @dataclass
 class SearchResult:
@@ -33,11 +35,10 @@ class SearchResult:
 
 
 class VectorStore:
-    COLLECTION = "code_index_chunks"
 
     def __init__(self, vs_cfg: dict, vector_size: int):
         self._vector_size = vector_size
-        self._collection = vs_cfg.get("collection", self.COLLECTION)
+        self._collection = constants.VECTOR_STORE_COLLECTION
 
         mode = vs_cfg.get("mode", "server")
         if mode == "server":
@@ -48,7 +49,7 @@ class VectorStore:
             # gRPC 우선 시도 후 실패 시 HTTP로 폴백
             self._client = self._create_client_with_fallback(host, port, grpc_port)
         else:
-            data_path = vs_cfg.get("data_path", "./data/qdrant")
+            data_path = str(Path(vs_cfg.get("data_dir", "./data")) / "qdrant")
             Path(data_path).mkdir(parents=True, exist_ok=True)
             self._client = QdrantClient(path=data_path)
 

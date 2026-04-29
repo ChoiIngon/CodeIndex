@@ -19,8 +19,7 @@ _DEFAULT = {
         "mode": "server",
         "host": "localhost",
         "port": 6333,
-        "data_path": "./data/qdrant",
-        "collection": "code_index_chunks",
+        "data_dir": "./data",
     },
     "search": {
         "top_k": 20,

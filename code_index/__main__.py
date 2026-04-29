@@ -343,8 +343,8 @@ if _GET_CHUNK:
 from code_index.store.metadata_store import MetadataStore  # noqa: E402
 
 vs_cfg   = cfg["vector_store"]
-data_dir = vs_cfg.get("data_path", "./data/qdrant")
-meta_path = os.path.join(os.path.dirname(data_dir), "metadata.db")
+data_dir = vs_cfg.get("data_dir", "./data")
+meta_path = os.path.join(data_dir, "metadata.db")
 
 _meta_check = MetadataStore(meta_path)
 _stats = _meta_check.stats()
@@ -367,3 +367,12 @@ if _INDEX_ONLY:
 from code_index.mcp.server import start_server  # noqa: E402
 
 start_server(cfg, http_port=_HTTP_PORT)
+
+
+def main() -> None:
+    """console_scripts entry point.
+
+    모든 실행 로직은 모듈 레벨에서 처리되므로 이 함수는 비워 둡니다.
+    ``pip install -e .`` 후 생성되는 ``code_index`` 명령어가 이 함수를 호출하며,
+    import 시점에 이미 전체 프로그램이 실행됩니다.
+    """

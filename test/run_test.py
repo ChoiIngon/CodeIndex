@@ -60,14 +60,14 @@ def main() -> None:
     data_backup_needed = backup_data_directory()
 
     test_cases = [
-        #("실행 옵션 테스트",           test_exec_options),
-        #("코드 검색 정확도 테스트",     test_search_code),
-        #("파일 아웃라인 조회 테스트",   test_get_file_outline),
-        #("청크 조회 테스트",            test_get_chunk),
-        #("증분 업데이트 테스트",        test_incremental_update),
-        #("데이터 정리 테스트",          test_data_cleanup),
-        #("소스 경로 제거 테스트",       test_source_path_removal),
-        #("프로젝트 삭제 테스트",        test_project_deletion),
+        ("실행 옵션 테스트",           test_exec_options),
+        ("코드 검색 정확도 테스트",     test_search_code),
+        ("파일 아웃라인 조회 테스트",   test_get_file_outline),
+        ("청크 조회 테스트",            test_get_chunk),
+        ("증분 업데이트 테스트",        test_incremental_update),
+        ("데이터 정리 테스트",          test_data_cleanup),
+        ("소스 경로 제거 테스트",       test_source_path_removal),
+        ("프로젝트 삭제 테스트",        test_project_deletion),
         ("제외 패턴 테스트",            test_exclude_patterns),
     ]
     try:

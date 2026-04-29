@@ -40,9 +40,9 @@ def search_code(cfg):
     emb_cfg  = cfg["embedding"]
     model_cfg = cfg["models"]
     cache_dir = model_cfg.get("cache_dir", "")
-    data_dir = vs_cfg.get("data_path", constants.DEFAULT_PATHS["data_dir"])
-    meta_path  = os.path.join(os.path.dirname(data_dir), constants.DEFAULT_PATHS["metadata_db"])
-    cache_path = os.path.join(os.path.dirname(data_dir), constants.DEFAULT_PATHS["embed_cache_db"])
+    data_dir = vs_cfg.get("data_dir", constants.DEFAULT_PATHS["data_dir"])
+    meta_path  = os.path.join(data_dir, constants.DEFAULT_PATHS["metadata_db"])
+    cache_path = os.path.join(data_dir, constants.DEFAULT_PATHS["embed_cache_db"])
 
     from code_index.models.model_manager import resolve_model  # noqa: E402
     

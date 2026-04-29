@@ -28,8 +28,8 @@ def get_chunk(cfg):
         sys.exit(1)
 
     vs_cfg   = cfg["vector_store"]
-    data_dir = vs_cfg.get("data_path", constants.DEFAULT_PATHS["data_dir"])
-    meta_path = os.path.join(os.path.dirname(data_dir), constants.DEFAULT_PATHS["metadata_db"])
+    data_dir = vs_cfg.get("data_dir", constants.DEFAULT_PATHS["data_dir"])
+    meta_path = os.path.join(data_dir, constants.DEFAULT_PATHS["metadata_db"])
 
     _metadata = MetadataStore(meta_path)
     _chunk    = _metadata.get_chunk(_chunk_id)

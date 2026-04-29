@@ -1,16 +1,20 @@
-# CodeIndex
+﻿# CodeIndex
 
 게임 서버 소스코드(.cs / .h / .cpp)를 인덱싱하고, 자연어 질의에 관련 코드 청크를 반환하는 **로컬 MCP 서버**입니다.  
 VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이언트와 연동됩니다.
 
 ## 특징
 
-- 외부 API 키 불필요 — 임베딩 모델을 최초 실행 시 HuggingFace에서 자동 다운로드
 - **프로젝트별 필터링** — 여러 프로젝트를 동시에 인덱싱하고 검색 시 특정 프로젝트로 범위 제한
-- Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합
-- SHA-256 기반 증분 인덱싱 — 변경된 파일만 재처리
-- GPU 자동 감지 및 CUDA wheel 자동 설치
-- MCP stdio / HTTP(streamable-http) 두 가지 전송 방식 지원
+- **Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합** — 의미 기반 벡터 검색과 키워드 기반 BM25를 융합하여 정확도 향상
+- **SHA-256 기반 증분 인덱싱** — 변경된 파일만 재처리하여 대규모 코드베이스에서도 빠른 업데이트
+- **Tree-sitter AST 파싱** — C++/C/C# 소스를 AST로 분석해 함수·클래스·메서드·네임스페이스 단위로 정밀 청킹
+- **content_hash 임베딩 캐싱** — 동일 코드 청크의 임베딩 벡터를 SQLite에 캐싱하여 재인덱싱 속도 향상
+- **ProcessPoolExecutor 병렬 청킹** — 멀티프로세스로 파일 파싱·청킹을 병렬 처리
+- **Qdrant 자동 설치 및 관리** — 최초 실행 시 Qdrant 바이너리를 자동 다운로드하고 서브프로세스로 관리
+- **랭킹 재정렬** — cross-encoder 모델로 검색 결과를 재정렬해 정확도 향상 (`use_reranker: true`)
+- **GPU 자동 감지 및 CUDA wheel 자동 설치** — NVIDIA GPU 검출 시 적합한 PyTorch CUDA 버전 자동 설치
+- **MCP stdio / HTTP(streamable-http) 두 가지 전송 방식** — 단일 에디터는 stdio, 여러 에디터 동시 사용 시 HTTP
 
 ---
 
@@ -26,10 +30,11 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 
 ## Quick Start
 
-1. **클론**
+1. **클론 및 설치**
    ```powershell
    git clone https://github.com/ChoiIngon/CodeIndex.git
    cd CodeIndex
+   pip install -e .
    ```
 
 2. **인덱싱 대상 경로 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
@@ -52,18 +57,41 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
    }
    ```
 
-3. **MCP 서버 실행 및 에디터 연동** (자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고)
+3. **MCP 서버 실행**
+   ```powershell
+   python -m code_index --http-port 6380
+   ```
+
+4. **에디터 연동**
+
+   **VS Code / Visual Studio 2022 - HTTP**
+
+   ```json
+   {
+     "servers": {
+       "CodeIndex": {
+         "type": "http",
+         "url": "http://127.0.0.1:6380/mcp"
+       }
+     }
+   }
+   ```
+   - `<솔루션폴더>\.vscode\mcp.json` 파일 생성 후 위 내용 복사&붙여 넣기
+   - claude 연동 및 http/stdio 프로토콜 선택 연동등 자세한 내용은 [MCP 에디터 연동]   (#mcp-에디터-연동) 참고
 
 ## 설치
 
 ```powershell
 git clone https://github.com/ChoiIngon/CodeIndex.git
 cd CodeIndex
+pip install -e .
 ```
 
-**의존성은 첫 실행 시 자동 설치됩니다.** GPU가 감지되면 적절한 PyTorch 버전을 자동 선택합니다.
+`pip install -e .`는 `code_index` 명령어를 시스템에 등록합니다. 이후 어느 디렉터리에서든 `python -m code_index` 또는 `code_index`로 실행할 수 있습니다.
 
-> **참고**: GPU 환경에서는 CUDA 11.8+ 또는 12.x에 맞는 PyTorch 안정 버전이 자동 설치됩니다. 설치 실패 시 CPU 버전으로 폴백됩니다.
+**의존성을 가진 모듈들은 첫 실행 시 자동 설치됩니다.** GPU가 감지되면 적절한 PyTorch 버전을 자동 선택합니다.
+
+> **참고**: GPU 환경에서는 CUDA 11.8+ 또는 12.x에 맞는 PyTorch 안정 버전이 자동 설치됩니다. GPU를 찾지 못하는 경우 CPU 버전으로 실행됩니다.
 
 ---
 
@@ -103,8 +131,7 @@ cd CodeIndex
     "mode": "server",
     "host": "localhost",
     "port": 6333,
-    "data_path": "./data/qdrant",
-    "collection": "code_index_chunks"
+    "data_dir": "./data"
   },
   "search": {
     "top_k": 20,
@@ -172,8 +199,7 @@ cd CodeIndex
 | `mode` | `"server"`: 별도 Qdrant 프로세스 사용 (권장), `"embedded"`: Python 프로세스 내 내장 모드 | `"server"` |
 | `host` | Qdrant 서버 호스트. `mode: "server"` 일 때 사용 | `"localhost"` |
 | `port` | Qdrant HTTP 포트. gRPC는 `port + 1` 자동 사용 | `6333` |
-| `data_path` | Qdrant 데이터 저장 경로. `mode: "server"` 시 서버 시작 인자로 전달됨 | `"./data/qdrant"` |
-| `collection` | Qdrant 컬렉션 이름. 변경 시 기존 데이터와 호환되지 않으므로 재인덱싱 필요 | `"code_index_chunks"` |
+| `data_dir` | 데이터 저장 루트 경로. 이 경로 하위에 `qdrant/` 디렉터리가 생성되며, `metadata.db`와 `embed_cache.db`도 이 경로에 저장됨 | `"./data"` |
 
 > **server mode**: 최초 실행 시 `.cache/qdrant/qdrant.exe`를 GitHub Releases에서 자동 다운로드하고 백그라운드 프로세스로 기동합니다. code_index 종료 시 함께 종료됩니다.
 
@@ -197,52 +223,51 @@ cd CodeIndex
 
 ## 실행
 
-### 인덱싱만 수행
+* 인덱싱만 수행
+   ```powershell
+   python -m code_index --index-only
+   ```
 
-```powershell
-python -m code_index --index-only
-```
+* stdio 모드로 MCP 서버 실행 (단일 에디터)
 
-### stdio 모드로 MCP 서버 실행 (단일 에디터)
+   ```powershell
+   python -m code_index
+   ```
 
-```powershell
-python -m code_index
-```
+* HTTP 모드로 MCP 서버 실행 (여러 에디터 동시 사용)
 
-### HTTP 모드로 MCP 서버 실행 (여러 에디터 동시 사용)
+   ```powershell
+   python -m code_index --http-port 6380
+   ```
 
-```powershell
-python -m code_index --http-port 6380
-```
+* 인덱싱 상태 확인
 
-### 인덱싱 상태 확인
+   ```powershell
+   python -m code_index --status
+   ```
 
-```powershell
-python -m code_index --status
-```
+* CLI 검색 (MCP 없이 직접 질의)
 
-### CLI 검색 (MCP 없이 직접 질의)
-
-```powershell
-# 자연어 검색
-python -m code_index --search-code "데미지 계산 로직"
-
-# 필터 옵션
-python -m code_index --search-code "CalculateDamage" --top-k 10 --language cpp --symbol-type function
-
-# 프로젝트별 검색 (GameServer 프로젝트에서만 검색)
-python -m code_index --search-code "QA_Login serialize" --project "GameServer" --top-k 5
-
-# 프로젝트 간 비교 분석 예시
-python -m code_index --search-code "QA_Login serialize" --project "GameServer" --top-k 3
-python -m code_index --search-code "QA_Login deserialize" --project "Middleware" --top-k 3
-
-# 파일 심볼 목록
-python -m code_index --get-file-outline "combat.cpp"
-
-# 청크 ID로 코드 조회
-python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
-```
+   ```powershell
+   # 자연어 검색
+   python -m code_index --search-code "데미지 계산 로직"
+   
+   # 필터 옵션
+   python -m code_index --search-code "CalculateDamage" --top-k 10 --language cpp    --symbol-type function
+   
+   # 프로젝트별 검색 (GameServer 프로젝트에서만 검색)
+   python -m code_index --search-code "QA_Login serialize" --project "GameServer"    --top-k 5
+   
+   # 프로젝트 간 비교 분석 예시
+   python -m code_index --search-code "QA_Login serialize" --project "GameServer"    --top-k 3
+   python -m code_index --search-code "QA_Login deserialize" --project "Middleware"    --top-k 3
+   
+   # 파일 심볼 목록
+   python -m code_index --get-file-outline "combat.cpp"
+   
+   # 청크 ID로 코드 조회
+   python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
+   ```
 
 ---
 
@@ -269,16 +294,16 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 **VS Code**
 ```json
 {
-	"servers": {
-		"CodeIndex": {
-			"type": "stdio",
-			"command": "python",
-			"args": [ "-m", "code_index" ],
-			"env": {
-				"PYTHONPATH": "E:\\work\\CodeIndex"
-			}
-		}
-	}
+  "servers": {
+    "CodeIndex": {
+      "type": "stdio",
+      "command": "python",
+      "args": [ "-m", "code_index" ],
+      "env": {
+        "PYTHONPATH": "E:\\work\\CodeIndex"
+      }
+    }
+  }
 }
 ```
 - 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
@@ -287,16 +312,16 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 **Visual Studio 2022**
 ```json
 {
-	"servers": {
-		"CodeIndex": {
-			"type": "stdio",
-			"command": "python",
-			"args": [ "-m", "code_index" ],
-			"env": {
-				"PYTHONPATH": "E:\\work\\CodeIndex"
-			}
-		}
-	}
+  "servers": {
+    "CodeIndex": {
+      "type": "stdio",
+      "command": "python",
+      "args": [ "-m", "code_index" ],
+      "env": {
+        "PYTHONPATH": "E:\\work\\CodeIndex"
+      }
+    }
+  }
 }
 ```
 - 프로젝트 스코프: `<솔루션폴더>\.vs\mcp.json`
@@ -304,7 +329,7 @@ python -m code_index --get-chunk "fc617902-35bc-5155-b9d1-b94837fd181d"
 - vscode 호환: `<솔루션폴더>\.vscode\mcp.json`
 - cursor 호환: `<솔루션폴더>\.cursor\mcp.json`
 
-### HTTP 모드 (에디터 여러 개 동시 사용)
+### HTTP 모드
 
 먼저 서버를 실행합니다:
 ```powershell

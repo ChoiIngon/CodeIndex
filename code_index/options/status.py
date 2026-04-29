@@ -20,9 +20,9 @@ def status(cfg) -> None:
     from code_index.store.metadata_store import MetadataStore as _MS
 
     _vs_cfg   = cfg["vector_store"]
-    _data_dir = _vs_cfg.get("data_path", "./data/qdrant")
-    _meta_path  = os.path.join(os.path.dirname(_data_dir), "metadata.db")
-    _cache_path = os.path.join(os.path.dirname(_data_dir), "embed_cache.db")
+    _data_dir = _vs_cfg.get("data_dir", "./data")
+    _meta_path  = os.path.join(_data_dir, "metadata.db")
+    _cache_path = os.path.join(_data_dir, "embed_cache.db")
     
     _source_paths = get_all_source_paths(cfg)
 

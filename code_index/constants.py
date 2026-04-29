@@ -46,12 +46,15 @@ PYTORCH_CUDA_URLS = {
 # ── 기본 경로 ───────────────────────────────────────────────────────────────
 DEFAULT_PATHS = {
     "settings": "config/settings.json",
-    "data_dir": "./data/qdrant", 
+    "data_dir": "./data",
     "metadata_db": "metadata.db",
     "embed_cache_db": "embed_cache.db",
     "cache_dir": ".cache",
     "log_file": "log.txt",
 }
+
+# ── 벡터 스토어 ─────────────────────────────────────────────────────────────
+VECTOR_STORE_COLLECTION = "code_index_chunks"
 
 # ── 네트워크 포트 ───────────────────────────────────────────────────────────
 DEFAULT_PORTS = {

@@ -282,7 +282,7 @@ def ensure_qdrant_server(vs_cfg: dict, cache_root: Path) -> None:
 
     host     = vs_cfg.get("host", "localhost")
     port     = int(vs_cfg.get("port", 6333))
-    data_path = str(Path(vs_cfg.get("data_path", "./data/qdrant")).resolve())
+    data_path = str((Path(vs_cfg.get("data_dir", "./data")) / "qdrant").resolve())
 
     # 관리 중인 프로세스가 살아있으면 skip
     if _proc and _proc.poll() is None:

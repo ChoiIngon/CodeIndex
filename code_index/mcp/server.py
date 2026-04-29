@@ -38,9 +38,9 @@ def start_server(cfg: Optional[dict] = None, http_port: Optional[int] = None) ->
     model_cfg = cfg["models"]
     search_cfg = cfg["search"]
 
-    data_dir = vs_cfg.get("data_path", "./data/qdrant")
-    meta_path = os.path.join(os.path.dirname(data_dir), "metadata.db")
-    cache_path = os.path.join(os.path.dirname(data_dir), "embed_cache.db")
+    data_dir = vs_cfg.get("data_dir", "./data")
+    meta_path = os.path.join(data_dir, "metadata.db")
+    cache_path = os.path.join(data_dir, "embed_cache.db")
 
     metadata = MetadataStore(meta_path)
     cache = EmbedCache(cache_path)
