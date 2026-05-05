@@ -1,19 +1,19 @@
 ﻿# CodeIndex
 
-게임 서버 소스코드(.cs / .h / .cpp)를 인덱싱하고, 자연어 질의에 관련 코드 청크를 반환하는 **로컬 MCP 서버**입니다.  
+소스코드(.cs / .h / .cpp)를 인덱싱하고, 자연어 질의에 관련 코드 청크를 반환하는 **로컬 MCP 서버**입니다.  
 VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이언트와 연동됩니다.
 
 ## 특징
 
 - **프로젝트별 필터링** — 여러 프로젝트를 동시에 인덱싱하고 검색 시 특정 프로젝트로 범위 제한
-- **Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합** — 의미 기반 벡터 검색과 키워드 기반 BM25를 융합하여 정확도 향상
-- **SHA-256 기반 증분 인덱싱** — 변경된 파일만 재처리하여 대규모 코드베이스에서도 빠른 업데이트
-- **Tree-sitter AST 파싱** — C++/C/C# 소스를 AST로 분석해 함수·클래스·메서드·네임스페이스 단위로 정밀 청킹
-- **content_hash 임베딩 캐싱** — 동일 코드 청크의 임베딩 벡터를 SQLite에 캐싱하여 재인덱싱 속도 향상
-- **ProcessPoolExecutor 병렬 청킹** — 멀티프로세스로 파일 파싱·청킹을 병렬 처리
 - **Qdrant 자동 설치 및 관리** — 최초 실행 시 Qdrant 바이너리를 자동 다운로드하고 서브프로세스로 관리
-- **랭킹 재정렬** — cross-encoder 모델로 검색 결과를 재정렬해 정확도 향상 (`use_reranker: true`)
 - **GPU 자동 감지 및 CUDA wheel 자동 설치** — NVIDIA GPU 검출 시 적합한 PyTorch CUDA 버전 자동 설치
+- **SHA-256 기반 증분 인덱싱** — 변경된 파일만 재처리하여 대규모 코드베이스에서도 빠른 업데이트
+- **Tree-sitter AST 파싱** — C++/C/C# 소스를 AST로 분석해 함수·클래스·메서드·네임스페이스 단위로 정밀 
+- **Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합** — 의미 기반 벡터 검색과 키워드 기반 BM25를 융합하여 정확도 향상
+- **랭킹 재정렬** — cross-encoder 모델로 검색 결과를 재정렬해 정확도 향상 (`use_reranker: true`)
+청킹
+- **content_hash 임베딩 캐싱** — 동일 코드 청크의 임베딩 벡터를 SQLite에 캐싱하여 재인덱싱 속도 향상
 - **MCP stdio / HTTP(streamable-http) 두 가지 전송 방식** — 단일 에디터는 stdio, 여러 에디터 동시 사용 시 HTTP
 
 ---
@@ -64,8 +64,50 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 
 4. **에디터 연동**
 
-   **VS Code / Visual Studio 2022 - HTTP**
+   **4-1. stdio 모드** (단일 에디터 사용 시)
 
+   MCP 서버를 별도로 실행할 필요 없이 에디터가 직접 프로세스를 기동합니다.
+
+   **VS Code** — `<워크스페이스>\.vscode\mcp.json`
+   ```json
+   {
+     "servers": {
+       "CodeIndex": {
+         "type": "stdio",
+         "command": "python",
+         "args": [ "-m", "code_index" ],
+         "env": {
+           "PYTHONPATH": "E:\\work\\CodeIndex"
+         }
+       }
+     }
+   }
+   ```
+
+   **Visual Studio 2022** — `<솔루션폴더>\.vs\mcp.json`
+   ```json
+   {
+     "servers": {
+       "CodeIndex": {
+         "type": "stdio",
+         "command": "python",
+         "args": [ "-m", "code_index" ],
+         "env": {
+           "PYTHONPATH": "E:\\work\\CodeIndex"
+         }
+       }
+     }
+   }
+   ```
+
+   **4-2. HTTP 모드** (여러 에디터 동시 사용 시)
+
+   먼저 서버를 실행한 뒤, 각 에디터에 URL을 등록합니다.
+   ```powershell
+   python -m code_index --http-port 6380
+   ```
+
+   **VS Code / Visual Studio 2022** — `<워크스페이스 또는 솔루션폴더>\.vscode\mcp.json`
    ```json
    {
      "servers": {
@@ -76,8 +118,8 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
      }
    }
    ```
-   - `<솔루션폴더>\.vscode\mcp.json` 파일 생성 후 위 내용 복사&붙여 넣기
-   - claude 연동 및 http/stdio 프로토콜 선택 연동등 자세한 내용은 [MCP 에디터 연동]   (#mcp-에디터-연동) 참고
+
+   - Claude Desktop 연동 등 자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고
 
 ## 설치
 
