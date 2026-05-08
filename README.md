@@ -6,15 +6,14 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 ## 특징
 
 - **프로젝트별 필터링** — 여러 프로젝트를 동시에 인덱싱하고 검색 시 특정 프로젝트로 범위 제한
-- **Qdrant 자동 설치 및 관리** — 최초 실행 시 Qdrant 바이너리를 자동 다운로드하고 서브프로세스로 관리
+- **Qdrant 벡터 DB(https://qdrant.tech/) 자동 설치 및 관리** — 최초 실행 시 Qdrant 바이너리를 자동 다운로드하고 서브프로세스로 관리
 - **GPU 자동 감지 및 CUDA wheel 자동 설치** — NVIDIA GPU 검출 시 적합한 PyTorch CUDA 버전 자동 설치
 - **SHA-256 기반 증분 인덱싱** — 변경된 파일만 재처리하여 대규모 코드베이스에서도 빠른 업데이트
+- **content_hash 임베딩 캐싱** — 동일 코드 청크의 임베딩 벡터를 SQLite에 캐싱하여 재인덱싱 속도 향상
 - **Tree-sitter AST 파싱** — C++/C/C# 소스를 AST로 분석해 함수·클래스·메서드·네임스페이스 단위로 정밀 
 - **Dense(HNSW) + BM25 하이브리드 검색 + RRF 점수 결합** — 의미 기반 벡터 검색과 키워드 기반 BM25를 융합하여 정확도 향상
 - **랭킹 재정렬** — cross-encoder 모델로 검색 결과를 재정렬해 정확도 향상 (`use_reranker: true`)
-청킹
-- **content_hash 임베딩 캐싱** — 동일 코드 청크의 임베딩 벡터를 SQLite에 캐싱하여 재인덱싱 속도 향상
-- **MCP stdio / HTTP(streamable-http) 두 가지 전송 방식** — 단일 에디터는 stdio, 여러 에디터 동시 사용 시 HTTP
+- **MCP 서버 지원** - stdio / HTTP(streamable-http) 두 가지 전송 방식 지원
 
 ---
 
@@ -22,92 +21,64 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
 
 - Python 3.11+
 - NVIDIA GPU 권장 (CPU 동작 가능, 속도 저하)
-- CUDA 11.8+ 또는 12.x (GPU 사용 시)
-
-> **GPU 호환성**: RTX 3050/3060/4090 등 대부분의 NVIDIA GPU 지원. CUDA 12.4 환경에서는 PyTorch 안정 버전(2.5.x) 자동 설치됩니다.
+- NVIDIA GPU 사용 시 CUDA 11.8+ 또는 12.x 드라이버 설치 필요(https://developer.nvidia.com/cuda-downloads)
 
 ---
 
-## Quick Start
+## 설치 및 MCP 서버 에디터 연동
 
-1. **클론 및 설치**
+1. **클론 및 설치** — 레포지토리 클론 및 파이썬 패키징화
+
    ```powershell
    git clone https://github.com/ChoiIngon/CodeIndex.git
    cd CodeIndex
    pip install -e .
    ```
 
-2. **인덱싱 대상 경로 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
+   - `pip install -e .`는 `code_index` 명령어를 시스템에 등록합니다. 이후 어느 디렉터리에서든 `python -m code_index` 또는 `code_index`로 실행할 수 있습니다.
+   - **의존성을 가진 모듈들은 첫 실행 시 자동 설치됩니다.** GPU가 감지되면 적절한 PyTorch 버전을 자동 선택합니다.
+   - **참고**: GPU 환경에서는 CUDA 11.8+ 또는 12.x에 맞는 PyTorch 안정 버전이 자동 설치됩니다. GPU를 찾지 못하는 경우 CPU 버전으로 실행됩니다.
+
+2. **개인화 설정** — `config/settings.json`에 프로젝트별 인덱싱 설정 추가 (자세한 내용은 [설정](#설정) 참고)
+   
+   `config/settings.json.template`을 복사, `config/settings.json`로 수정하여 사용
+
+   **2-1. 인덱싱 대상 프로젝트 경로 설정**
+
    ```json
    { 
      "indexer": { 
        "GameClient": { 
-         "source_paths": ["C:/MyProject/Client/Assets"], // 실제 경로로 변경
+         "source_paths": ["C:/MyProject/Client/Assets"], // 절대 경로 사용 권장
          "extensions": [".cs"]
        },
        "GameServer": { 
-         "source_paths": ["C:/MyProject/Server/src"],
+         "source_paths": ["C:/MyProject/Server/src1"],
          "extensions": [".cpp", ".h", ".c"]
-       },
-       "Middleware": { 
-         "source_paths": ["C:/MyProject/Middleware/src"],
-         "extensions": [".cs"]
        }
      }
    }
    ```
 
-3. **MCP 서버 실행**
+   **2-2. 인덱싱 데이터 저장 위치 설정**
+
+   ```json
+   {
+     "vector_store": {
+      "data_dir": "C:/MyProject/CodeIndex/data"
+     } 
+   }
+   ```
+
+3. **MCP 서버 실행 및 에디터 연동**
+
+   **3-1. HTTP 모드** (권장)
+
+   먼저 MCP 서버를 실행한 뒤, 각 에디터에 URL을 등록합니다.
    ```powershell
    python -m code_index --http-port 6380
    ```
-
-4. **에디터 연동**
-
-   **4-1. stdio 모드** (단일 에디터 사용 시)
-
-   MCP 서버를 별도로 실행할 필요 없이 에디터가 직접 프로세스를 기동합니다.
-
-   **VS Code** — `<워크스페이스>\.vscode\mcp.json`
-   ```json
-   {
-     "servers": {
-       "CodeIndex": {
-         "type": "stdio",
-         "command": "python",
-         "args": [ "-m", "code_index" ],
-         "env": {
-           "PYTHONPATH": "E:\\work\\CodeIndex"
-         }
-       }
-     }
-   }
-   ```
-
-   **Visual Studio 2022** — `<솔루션폴더>\.vs\mcp.json`
-   ```json
-   {
-     "servers": {
-       "CodeIndex": {
-         "type": "stdio",
-         "command": "python",
-         "args": [ "-m", "code_index" ],
-         "env": {
-           "PYTHONPATH": "E:\\work\\CodeIndex"
-         }
-       }
-     }
-   }
-   ```
-
-   **4-2. HTTP 모드** (여러 에디터 동시 사용 시)
-
-   먼저 서버를 실행한 뒤, 각 에디터에 URL을 등록합니다.
-   ```powershell
-   python -m code_index --http-port 6380
-   ```
-
-   **VS Code / Visual Studio 2022** — `<워크스페이스 또는 솔루션폴더>\.vscode\mcp.json`
+   **VS Code / Visual Studio 2022** — mcp.json
    ```json
    {
      "servers": {
@@ -119,21 +90,63 @@ VS Code, Visual Studio 2022, Claude Desktop 등 MCP를 지원하는 AI 클라이
    }
    ```
 
-   - Claude Desktop 연동 등 자세한 내용은 [MCP 에디터 연동](#mcp-에디터-연동) 참고
+   **Claude Desktop** — claude_desktop_config.json
+   ```json
+   {
+     "mcpServers": {
+       "CodeIndex": {
+         "type": "http",
+         "url": "http://127.0.0.1:6380/mcp"
+       }
+     }
+   }
+   ```
 
-## 설치
+   **3-2. stdio 모드** (비권장)
 
-```powershell
-git clone https://github.com/ChoiIngon/CodeIndex.git
-cd CodeIndex
-pip install -e .
-```
+   stdio 모드에서는 MCP 서버 프로세스를 별도로 실행할 필요 없이 에디터가 직접 프로세스를 기동합니다.
+   > 대규모 프로젝트 경우 로딩 시간이 길어, 에디터에서 자식 프로세스를 생성하다 타임 아웃 발생 할 수 있음.
 
-`pip install -e .`는 `code_index` 명령어를 시스템에 등록합니다. 이후 어느 디렉터리에서든 `python -m code_index` 또는 `code_index`로 실행할 수 있습니다.
+   **VS Code / Visual Studio 2022** — mcp.json
+   ```json
+   {
+     "servers": {
+       "CodeIndex": {
+         "type": "stdio",
+         "command": "python",
+         "args": [ "-m", "code_index" ],
+         "env": {
+           "PYTHONPATH": "E:\\work\\CodeIndex"
+         }
+       }
+     }
+   }
+   ```
 
-**의존성을 가진 모듈들은 첫 실행 시 자동 설치됩니다.** GPU가 감지되면 적절한 PyTorch 버전을 자동 선택합니다.
+   **Claude Desktop** — claude_desktop_config.json
+   ```json
+   {
+	"mcpServers": {
+       "CodeIndex": {
+         "command": "python",
+         "args": ["-m", "code_index"],
+         "cwd": "E:/work/CodeIndex"
+       }
+     }
+   }
+   ```
 
-> **참고**: GPU 환경에서는 CUDA 11.8+ 또는 12.x에 맞는 PyTorch 안정 버전이 자동 설치됩니다. GPU를 찾지 못하는 경우 CPU 버전으로 실행됩니다.
+   **3-3. mcp 설정파일 경로**
+   
+   | 에디터 | 우선 순위 | 경로 | 범위 |
+   |----------|----------|------|------|
+   | VSCode| 1 | <워크스페이스폴더>/.vscode/mcp.json | 워크스페이스 단위 |
+   |       | 2 | %USERPROFILE%/.vscode/mcp.json | 사용자 전체 (글로벌) |
+   | Visual Studio 2022|  1 | <솔루션폴더>/.vs/mcp.json | 솔루션 단위 (VS 전용) |
+   |       | 2 | <솔루션폴더>/.vscode/mcp.json | 솔루션 단위 (VS Code 공유 가능) |
+   |       | 3 | %USERPROFILE%/.mcp.json | 사용자 전체 (글로벌) |
+   | Claude Desktop | 1 | %APPDATA%\Claude\claude_desktop_config.json | 사용자 전체 (글로벌) |
+   > 참고: Claude Desktop은 단일 글로벌 설정 파일만 지원하며, 워크스페이스/프로젝트 단위의 별도 경로는 지원하지 않습니다.
 
 ---
 
@@ -241,7 +254,7 @@ pip install -e .
 | `mode` | `"server"`: 별도 Qdrant 프로세스 사용 (권장), `"embedded"`: Python 프로세스 내 내장 모드 | `"server"` |
 | `host` | Qdrant 서버 호스트. `mode: "server"` 일 때 사용 | `"localhost"` |
 | `port` | Qdrant HTTP 포트. gRPC는 `port + 1` 자동 사용 | `6333` |
-| `data_dir` | 데이터 저장 루트 경로. 이 경로 하위에 `qdrant/` 디렉터리가 생성되며, `metadata.db`와 `embed_cache.db`도 이 경로에 저장됨 | `"./data"` |
+| `data_dir` | 데이터 저장 루트 경로. 이 경로 하위에 `qdrant/` 디렉터리가 생성되며, `metadata.db`와 `embed_cache.db`도 이 경로에 저장됨 | `"./data"` 또는 `"C:\data` |
 
 > **server mode**: 최초 실행 시 `.cache/qdrant/qdrant.exe`를 GitHub Releases에서 자동 다운로드하고 백그라운드 프로세스로 기동합니다. code_index 종료 시 함께 종료됩니다.
 
@@ -313,98 +326,6 @@ pip install -e .
 
 ---
 
-## MCP 에디터 연동
-
-### stdio 모드
-사용 환경에 따라 적절한 디렉토리에 아래 처럼 mcp.json을 작성 후 에디터 재시작합니다.
-
-**Claude Desktop** 
-```json
-{
-  "mcpServers": {
-    "CodeIndex": {
-      "command": "python",
-      "args": ["-m", "code_index"],
-      "cwd": "E:/work/CodeIndex"
-    }
-  }
-}
-```
-- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
-- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Claude\claude_desktop_config.json`(`C:\Users\<사용자명>\AppData\Roaming\Claude\claude_desktop_config.json`) 
-
-**VS Code**
-```json
-{
-  "servers": {
-    "CodeIndex": {
-      "type": "stdio",
-      "command": "python",
-      "args": [ "-m", "code_index" ],
-      "env": {
-        "PYTHONPATH": "E:\\work\\CodeIndex"
-      }
-    }
-  }
-}
-```
-- 프로젝트 스코프(Local - 최우선 순위): 현재 작업 중인 워크스페이스의 루트 폴더 내 `.vscode/mcp.json`
-- 유저 스코프(Global - 낮은 순위): `%APPDATA%\Code\User\mcp.json`(`C:\Users\<사용자명>\AppData\Roaming\Code\User\mcp.json`)
-
-**Visual Studio 2022**
-```json
-{
-  "servers": {
-    "CodeIndex": {
-      "type": "stdio",
-      "command": "python",
-      "args": [ "-m", "code_index" ],
-      "env": {
-        "PYTHONPATH": "E:\\work\\CodeIndex"
-      }
-    }
-  }
-}
-```
-- 프로젝트 스코프: `<솔루션폴더>\.vs\mcp.json`
-- 유저 스코프: `%USERPROFILE%\.mcp.json` - (`C:\Users\<사용자명>\.mcp.json`)
-- vscode 호환: `<솔루션폴더>\.vscode\mcp.json`
-- cursor 호환: `<솔루션폴더>\.cursor\mcp.json`
-
-### HTTP 모드
-
-먼저 서버를 실행합니다:
-```powershell
-python -m code_index --http-port 6380
-```
-
-각 에디터 MCP 설정에 URL을 등록합니다:
-
-**Claude Desktop**
-```json
-{
-  "mcpServers": {
-    "CodeIndex": {
-      "url": "http://127.0.0.1:6380/mcp"
-    }
-  }
-}
-```
-
-**VS Code / Visual Studio 2022**
-```json
-{
-  "servers": {
-    "CodeIndex": {
-      "type": "http",
-      "url": "http://127.0.0.1:6380/mcp"
-    }
-  }
-}
-```
-
----
-
 ## MCP 도구 목록
 
 AI 클라이언트가 호출할 수 있는 도구입니다.
@@ -457,15 +378,18 @@ CodeIndex/
 ├── code_index/
 │   ├── __main__.py        # 진입점, CLI 옵션 처리
 │   ├── config.py          # 설정 로드 및 기본값
+│   ├── constants.py       # 전역 상수 및 설정값
 │   ├── indexer/
 │   │   ├── scanner.py     # 파일 스캔 및 변경 감지
 │   │   ├── parser.py      # Tree-sitter AST 파싱
 │   │   ├── chunker.py     # 심볼 단위 청킹
 │   │   ├── embedder.py    # 임베딩 생성
 │   │   └── pipeline.py    # 인덱싱 파이프라인 오케스트레이션
+│   ├── options/               # CLI 옵션별 처리 모듈
 │   ├── store/
 │   │   ├── vector_store.py    # Qdrant HNSW 벡터 저장소
 │   │   ├── metadata_store.py  # SQLite 메타데이터 + FTS5
+│   │   ├── qdrant_server.py   # Qdrant 바이너리 자동 다운로드 및 서버 관리
 │   │   └── cache.py           # 임베딩 캐시
 │   ├── retriever/
 │   │   ├── hybrid_search.py   # Dense + BM25 + RRF
@@ -476,9 +400,14 @@ CodeIndex/
 │   └── models/
 │       └── model_manager.py   # HuggingFace 모델 경로 관리
 ├── config/
-│   └── settings.json      # 사용자 설정
+│   └── settings.json.template # 설정 템플릿
 ├── test/
-│   ├── run_test.py         # 정확도 테스트
-│   └── data/               # 테스트용 샘플 소스코드
-└── data/                   # 인덱스 데이터 (gitignore)
+│   ├── run_test.py            # 정확도 테스트 실행
+│   ├── code_index.py          # CodeIndex 자식 프로세스 관리
+│   ├── utility.py             # 테스트 유틸리티
+│   ├── project1/              # C++/C# 테스트용 샘플 소스코드
+│   ├── project2_1/            # C++/C# 테스트용 샘플 소스코드
+│   ├── project2_2/            # C++/TypeScript 테스트용 샘플 소스코드
+│   └── test_suite/            # 자동화 테스트 모음
+└── data/                      # 인덱스 데이터 (gitignore)
 ```

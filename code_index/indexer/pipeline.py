@@ -22,14 +22,24 @@ from .scanner import detect_changes, file_sha256, scan_files
 def _chunk_worker(args: tuple) -> tuple:
     """별도 프로세스에서 파일 하나를 청킹하고 (fpath, chunks, sha, mtime, err) 반환."""
     fpath, chunk_cfg, project_name = args
+    chunks = []
+    err = None
+    
+    # SHA와 mtime은 항상 계산 (파일 존재 여부 체크)
+    try:
+        sha   = file_sha256(fpath)
+        mtime = os.path.getmtime(fpath)
+    except Exception as e:
+        return fpath, [], "", 0.0, str(e)
+    
+    # 청킹은 별도로 시도 (실패해도 SHA/mtime은 반환)
     try:
         from code_index.indexer.chunker import chunk_file
         chunks = chunk_file(fpath, chunk_cfg, project_name)
-        sha   = file_sha256(fpath)
-        mtime = os.path.getmtime(fpath)
-        return fpath, chunks, sha, mtime, None
     except Exception as e:
-        return fpath, [], "", 0.0, str(e)
+        err = str(e)
+    
+    return fpath, chunks, sha, mtime, err
 
 
 # ── 메인 인덱싱 ───────────────────────────────────────────────────────────────
@@ -39,16 +49,17 @@ def run_index(cfg: Optional[dict] = None) -> None:
         from ..config import load_config
         cfg = load_config()
 
-    from ..config import get_all_projects
+    from code_index.config import get_all_projects
+    from code_index import constants
 
     emb_cfg   = cfg["embedding"]
     vs_cfg    = cfg["vector_store"]
     model_cfg = cfg["models"]
     indexer_cfg = cfg["indexer"]  # indexer 레벨 설정
 
-    data_dir   = vs_cfg.get("data_dir", "./data")
-    meta_path  = os.path.join(data_dir, "metadata.db")
-    cache_path = os.path.join(data_dir, "embed_cache.db")
+    data_dir   = vs_cfg.get("data_dir", constants.DEFAULT_PATHS["data_dir"])
+    meta_path  = os.path.join(data_dir, constants.DEFAULT_PATHS["metadata_db"])
+    cache_path = os.path.join(data_dir, constants.DEFAULT_PATHS["embed_cache_db"])
 
     metadata     = MetadataStore(meta_path)
     cache        = EmbedCache(cache_path)
@@ -214,8 +225,9 @@ def _run_project_index(project_name: str, project_cfg: dict, indexer_cfg: dict, 
             print(f"[Pipeline] 오류 {fpath}: {err}", file=sys.stderr)
 
         if not chunks:
-            if sha:
-                metadata.upsert_file(fpath, sha, mtime)
+            # chunks가 없어도 파일 메타는 저장 (SHA와 mtime이 유효하면)
+            if sha and mtime:
+                metadata.upsert_file(fpath, sha, mtime, project_name)
             continue
 
         embed_buffer.extend(chunks)
@@ -230,7 +242,7 @@ def _run_project_index(project_name: str, project_cfg: dict, indexer_cfg: dict, 
 
     # 파일 메타 일괄 업데이트
     for fpath, (sha, mtime) in file_meta.items():
-        metadata.upsert_file(fpath, sha, mtime)
+        metadata.upsert_file(fpath, sha, mtime, project_name)
 
     t_total = time.time() - t_start
     print(

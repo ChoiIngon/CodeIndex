@@ -51,7 +51,7 @@ def _parse_cpp(source: str, file_path: str) -> list[ParsedSymbol]:
 
 def _walk_cpp(node, lines: list, symbols: list, namespace: str, parent_class: str):
     if node.type == "namespace_definition":
-        name = _cpp_child_text(node, "namespace_identifier", lines)
+        name = _extract_cpp_namespace_name(node, lines)
         ns = f"{namespace}::{name}" if namespace else name
         for child in node.children:
             _walk_cpp(child, lines, symbols, namespace=ns, parent_class=parent_class)
@@ -129,6 +129,51 @@ def _cpp_child_text(node, child_type: str, lines: list) -> str:
             s, e = child.start_point[0], child.end_point[0]
             return lines[s][child.start_point[1]:child.end_point[1]] if s == e else lines[s]
     return "unknown"
+
+
+def _extract_cpp_namespace_name(ns_def_node, lines: list) -> str:
+    """
+    namespace_definition 에서 네임스페이스 이름을 추출합니다.
+    - 단순 namespace: namespace Foo {} -> "Foo"
+    - C++17 nested namespace: namespace A::B::C {} -> "A::B::C"
+    """
+    # nested_namespace_specifier 자식 찾기
+    nested_spec = None
+    for child in ns_def_node.children:
+        if child.type == "nested_namespace_specifier":
+            nested_spec = child
+            break
+    
+    if nested_spec:
+        # nested namespace 처리
+        return _extract_nested_namespace_parts(nested_spec, lines)
+    else:
+        # 단순 namespace_identifier 처리
+        return _cpp_child_text(ns_def_node, "namespace_identifier", lines)
+
+
+def _extract_nested_namespace_parts(node, lines: list) -> str:
+    """
+    nested_namespace_specifier 에서 모든 부분을 '::' 로 연결하여 반환합니다.
+    예: Suite::Game::Function::NProcess
+    """
+    parts = []
+    _collect_namespace_parts(node, lines, parts)
+    return "::".join(parts)
+
+
+def _collect_namespace_parts(node, lines: list, parts: list):
+    """
+    nested_namespace_specifier 트리에서 모든 namespace_identifier 를 수집합니다.
+    """
+    if node.type == "namespace_identifier":
+        s, e = node.start_point[0], node.end_point[0]
+        name = lines[s][node.start_point[1]:node.end_point[1]] if s == e else lines[s]
+        parts.append(name)
+    elif node.type == "nested_namespace_specifier":
+        for child in node.children:
+            _collect_namespace_parts(child, lines, parts)
+
 
 
 def _find_function_declarator(node):

@@ -2,8 +2,7 @@
 #include <vector>
 #include <unordered_map>
 
-namespace GameServer {
-namespace Monster {
+namespace GameServer::Monster {
 
 static std::unordered_map<int, MonsterInstance> g_monsters;
 static int g_nextMonsterId = 1;
@@ -49,5 +48,4 @@ void HandleMonsterDeath(int instanceId, int killerPlayerId) {
     DespawnMonster(instanceId);
 }
 
-}
 }

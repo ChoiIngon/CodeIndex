@@ -1,8 +1,7 @@
 #pragma once
 #include <vector>
 
-namespace GameServer {
-namespace Monster {
+namespace GameServer::Monster {
 
 struct MonsterInstance {
     int instanceId;
@@ -36,4 +35,4 @@ void _GenerateDropItems(int instanceId, int killerPlayerId);
 void _GrantExpToKiller(int instanceId, int killerPlayerId);
 
 }
-}
+

@@ -64,8 +64,6 @@ MCP 설정:
   settings.json 의 mcp 섹션으로 전송 방식을 선택합니다.
 
   ── stdio 모드 (기본, --http-port 없을 때) ──────────────────────────────
-  에디터가 code_index를 자식 프로세스로 직접 실행합니다.
-  에디터 1개만 사용할 때 적합합니다.
 
   ▶ Claude Desktop
   ├ %APPDATA%\\Claude\\claude_desktop_config.json
@@ -104,6 +102,7 @@ MCP 설정:
   └ {{
       "mcpServers": {{
         "CodeIndex": {{
+          "type": "http",
           "url": "http://127.0.0.1:6380/mcp"
         }}
       }}

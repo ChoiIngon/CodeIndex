@@ -13,22 +13,45 @@ def test_get_file_outline() -> bool:
     """파일 아웃라인 조회 테스트"""
     log_info("파일 아웃라인 조회 테스트를 시작합니다...")
 
-    # 파일별 기대 심볼 목록
+    # 파일별 기대 심볼 목록 (namespace 정합성 포함 검증)
+    # get_file_outline의 name 필드는 fully qualified(예: GameServer::CalculateDamage)로 반환됨
     test_cases = [
         {
             "file_path": "combat.cpp",
-            "expected_symbols": ["CalculateDamage", "ApplyDamage", "CalculateSkillDamage", "CalculateHealAmount"],
-            "description": "combat.cpp 아웃라인",
+            "expected_symbols": [
+                {"name": "GameServer::CalculateDamage", "namespace": "GameServer"},
+                {"name": "GameServer::ApplyDamage", "namespace": "GameServer"},
+                {"name": "GameServer::CalculateSkillDamage", "namespace": "GameServer"},
+                {"name": "GameServer::CalculateHealAmount", "namespace": "GameServer"},
+            ],
+            "description": "combat.cpp 아웃라인 (namespace: GameServer)",
         },
         {
             "file_path": "player.h",
-            "expected_symbols": ["PlayerManager", "MovePlayer"],
-            "description": "player.h 아웃라인",
+            "expected_symbols": [
+                {"name": "GameServer::PlayerPosition", "namespace": "GameServer"},
+                {"name": "GameServer::PlayerManager", "namespace": "GameServer"},
+                {"name": "GameServer::PlayerManager::MovePlayer", "namespace": "GameServer"},
+            ],
+            "description": "player.h 아웃라인 (namespace: GameServer)",
         },
         {
             "file_path": "player.cpp",
-            "expected_symbols": ["PlayerManager", "MovePlayer"],
-            "description": "player.cpp 아웃라인",
+            "expected_symbols": [
+                {"name": "GameServer::PlayerManager::PlayerManager", "namespace": "GameServer"},
+                {"name": "GameServer::PlayerManager::MovePlayer", "namespace": "GameServer"},
+                {"name": "GameServer::PlayerManager::AttackPlayer", "namespace": "GameServer"},
+                {"name": "GameServer::PlayerManager::GetPosition", "namespace": "GameServer"},
+            ],
+            "description": "player.cpp 아웃라인 (namespace: GameServer)",
+        },
+        {
+            "file_path": "monster.h",
+            "expected_symbols": [
+                {"name": "GameServer::Monster::MonsterInstance", "namespace": "GameServer::Monster"},
+                {"name": "GameServer::Monster::MonsterSpawnData", "namespace": "GameServer::Monster"},
+            ],
+            "description": "monster.h 아웃라인 (namespace: GameServer::Monster - C++17 nested)",
         },
     ]
 
@@ -55,20 +78,24 @@ def test_get_file_outline() -> bool:
             for sym in symbols:
                 log_verbose(
                     f"  {sym.get('name', '')} ({sym.get('type', '')})"
-                    f" L{sym.get('line', '')}"
+                    f" ns={sym.get('namespace', '')} L{sym.get('line', '')}"
                 )
 
-            symbol_names = [sym.get("name", "") for sym in symbols]
+            # 모든 기대 심볼 검증 (fully-qualified name과 namespace 정합성 포함)
             for exp in expected:
-                # qualified name(예: "NS::Func") 또는 단순 이름 모두 허용
+                exp_name = exp["name"]
+                exp_ns   = exp["namespace"]
+                
                 matched = any(
-                    exp == name or name.endswith(f"::{exp}")
-                    for name in symbol_names
+                    sym.get("name") == exp_name and sym.get("namespace") == exp_ns
+                    for sym in symbols
                 )
+                
                 if matched:
-                    log_verbose(f"  ✅ '{exp}' 확인")
+                    log_verbose(f"  ✅ '{exp_name}' (ns: {exp_ns}) 확인")
                 else:
-                    log_error(f"[{desc}] 기대 심볼 '{exp}'이 결과에 없음 (반환: {symbol_names})")
+                    log_error(f"[{desc}] 기대 심볼을 찾을 수 없음: {exp_name} (ns: {exp_ns})")
+                    log_verbose(f"    파싱된 심볼: {[(s.get('name'), s.get('namespace')) for s in symbols]}")
                     all_passed = False
 
         if all_passed:

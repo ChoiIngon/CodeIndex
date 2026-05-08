@@ -41,10 +41,11 @@ class MetadataStore:
         c = self._con
         c.execute("""
             CREATE TABLE IF NOT EXISTS files (
-                file_path TEXT PRIMARY KEY,
-                sha256    TEXT NOT NULL,
-                mtime     REAL NOT NULL,
-                indexed_at TEXT NOT NULL
+                file_path    TEXT PRIMARY KEY,
+                sha256       TEXT NOT NULL,
+                mtime        REAL NOT NULL,
+                indexed_at   TEXT NOT NULL,
+                project_name TEXT NOT NULL DEFAULT ''
             )
         """)
         c.execute("""
@@ -86,12 +87,12 @@ class MetadataStore:
         ]
         return FileMeta(file_path=file_path, sha256=sha256, mtime=mtime, chunk_ids=chunk_ids)
 
-    def upsert_file(self, file_path: str, sha256: str, mtime: float):
+    def upsert_file(self, file_path: str, sha256: str, mtime: float, project_name: str = ""):
         from datetime import datetime, timezone
         indexed_at = datetime.now(timezone.utc).isoformat()
         self._con.execute(
-            "INSERT OR REPLACE INTO files VALUES (?,?,?,?)",
-            (file_path, sha256, mtime, indexed_at),
+            "INSERT OR REPLACE INTO files VALUES (?,?,?,?,?)",
+            (file_path, sha256, mtime, indexed_at, project_name),
         )
         self._con.commit()
 
@@ -142,10 +143,15 @@ class MetadataStore:
         return [r[0] for r in self._con.execute("SELECT file_path FROM files")]
 
     def get_project_file_paths(self, project_name: str) -> list:
-        """특정 프로젝트의 모든 파일 경로를 반환."""
+        """특정 프로젝트의 모든 파일 경로를 반환 (files 테이블 기반).
+        
+        개선사항:
+        - files 테이블의 project_name으로 프로젝트별 파일 직접 조회
+        - chunks와 동기화된 정확한 파일 목록 제공
+        """
         return [
             r[0] for r in self._con.execute(
-                "SELECT DISTINCT file_path FROM chunks WHERE project_name = ?",
+                "SELECT file_path FROM files WHERE project_name = ?",
                 (project_name,)
             )
         ]
@@ -222,10 +228,10 @@ class MetadataStore:
 
     def get_file_symbols(self, file_path: str) -> list:
         rows = self._con.execute(
-            "SELECT symbol_type, symbol_name, start_line FROM chunks WHERE file_path=? ORDER BY start_line",
+            "SELECT symbol_type, symbol_name, start_line, namespace FROM chunks WHERE file_path=? ORDER BY start_line",
             (file_path,),
         ).fetchall()
-        return [{"type": r[0], "name": r[1], "line": r[2]} for r in rows]
+        return [{"type": r[0], "name": r[1], "line": r[2], "namespace": r[3]} for r in rows]
 
     # ── BM25 FTS 검색 ──────────────────────────────────────────────────
 
